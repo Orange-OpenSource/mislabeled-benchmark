@@ -3,15 +3,21 @@
 import os
 from functools import partial
 
+from sklearn.preprocessing import OneHotEncoder
+
 from catboost import CatBoostClassifier
 from scipy.stats import loguniform, uniform
 from sklearn.kernel_approximation import RBFSampler
-from sklearn.linear_model import SGDClassifier
-from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedShuffleSplit
+from sklearn.linear_model import LogisticRegressionCV, SGDClassifier
+from sklearn.model_selection import (
+    RandomizedSearchCV,
+    RepeatedStratifiedKFold,
+    StratifiedShuffleSplit,
+)
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 
-from mislabeled.detect import ModelBasedDetector
+from mislabeled.detect import ModelProbingDetector
 from mislabeled.detect.detectors import (
     AreaUnderMargin,
     ConfidentLearning,
@@ -30,8 +36,9 @@ from mislabeled.ensemble import (
     NoEnsemble,
     ProgressiveEnsemble,
 )
-from mislabeled.ensemble._progressive import staged_fit
-from mislabeled.probe import LinearGradSimilarity
+from mislabeled.ensemble import staged_fit
+from mislabeled.probe import GradSimilarity, linearize
+from mislabeled.probe._linear import linearize_linear_model
 from mislabeled.split import QuantileSplitter, ThresholdSplitter
 
 seed = 1
@@ -59,6 +66,24 @@ def staged_fit_cat(estimator: CatBoostClassifier, X, y):
         yield shrinked
 
 
+## DEFINITION FOR LINEAR DETECTORS
+@linearize.register(CatBoostClassifier)
+def linearize_catboost(estimator: CatBoostClassifier, X, y):
+    leaves = OneHotEncoder().fit_transform(estimator.calc_leaf_indexes(X))
+    linear = RandomizedSearchCV(
+        klm[-1],
+        param_distributions={
+            "alpha": loguniform(1e-5, 10**-2.5),
+            "eta0": loguniform(1e-3, 1e0),
+        },
+        n_iter=10,
+        n_jobs=-1,
+    )
+    # linear = LogisticRegressionCV(solver="newton-cg", n_jobs=-1, max_iter=1000)
+    linear.fit(leaves, y)
+    return linearize_linear_model(linear.best_estimator_, leaves, y)
+
+
 # BASE MODEL DEFINITIONS
 
 knn = KNeighborsClassifier()
@@ -70,9 +95,9 @@ gb = CatBoostClassifier(
     verbose=0,
     random_state=seed,
     thread_count=-1,
-    task_type="GPU",
+    # task_type="GPU",
     # devices=gpu_device,
-    max_bin=32,
+    # max_bin=32,
     boosting_type="Plain",
     allow_writing_files=False,
 )
@@ -122,7 +147,7 @@ classifiers = {
 
 ## DETECTORS DEFINITION
 
-knn_loo = ModelBasedDetector(knn, LeaveOneOutEnsemble(n_jobs=-1), "accuracy", "sum")
+knn_loo = ModelProbingDetector(knn, LeaveOneOutEnsemble(n_jobs=-1), "accuracy", "sum")
 param_grid_knn_loo = prefix_param_grid_detector(param_grid_knn)
 
 gb_aum = AreaUnderMargin(gb)
@@ -176,7 +201,7 @@ param_grid_gb_vosg = prefix_param_grid_detector(param_grid_gb)
 klm_vosg = LinearVoSG(klm)
 param_grid_klm_vosg = prefix_param_grid_detector(param_grid_klm)
 
-agra = ModelBasedDetector(klm, NoEnsemble(), LinearGradSimilarity(), "sum")
+agra = ModelProbingDetector(klm, NoEnsemble(), GradSimilarity(), "sum")
 param_grid_klm_agra = param_grid_klm.copy()
 param_grid_klm_agra["sgd__fit_intercept"] = [True, False]
 param_grid_agra = prefix_param_grid_detector(param_grid_klm_agra)
@@ -215,10 +240,42 @@ detectors_gb = [
     ("gb_smallloss", gb_small_loss, param_grid_gb_small_loss),
 ]
 
+param_grid_lin_gb = {
+    "iterations": [100],
+    "learning_rate": loguniform(1e-5, 1e-1),
+    "reg_lambda": uniform(0, 100),
+}
+
+##LINEARIZED GB
+
+lin_gb_vosg = LinearVoSG(gb, steps=10)
+lin_gb_tracin = TracIn(gb, steps=10)
+lin_gb_agra = ModelProbingDetector(gb, NoEnsemble(), GradSimilarity(), "sum")
+
+lin_gb_influence = InfluenceDetector(gb)
+lin_gb_representer = RepresenterDetector(gb)
+
+detectors_linearized_gb = [
+    ("lin_gb_vosg", lin_gb_vosg, prefix_param_grid_detector(param_grid_lin_gb)),
+    ("lin_gb_tracin", lin_gb_tracin, prefix_param_grid_detector(param_grid_lin_gb)),
+    ("lin_gb_agra", lin_gb_agra, prefix_param_grid_detector(param_grid_lin_gb)),
+    (
+        "lin_gb_influence",
+        lin_gb_influence,
+        prefix_param_grid_detector(param_grid_lin_gb),
+    ),
+    (
+        "lin_gb_representer",
+        lin_gb_representer,
+        prefix_param_grid_detector(param_grid_lin_gb),
+    ),
+]
+
+
 ## AGRA SPECIFIC DETECTORS DEFINITION
 
-progressive_agra = ModelBasedDetector(
-    klm, ProgressiveEnsemble(), LinearGradSimilarity(), "sum"
+progressive_agra = ModelProbingDetector(
+    klm, ProgressiveEnsemble(), GradSimilarity(), "sum"
 )
 param_grid_progressive_agra = prefix_param_grid_detector(param_grid_klm)
 
@@ -227,12 +284,12 @@ def derivative(scores, masks):
     return scores[:, :, -1] - scores[:, :, 0]
 
 
-forget_agra = ModelBasedDetector(
-    klm, ProgressiveEnsemble(), LinearGradSimilarity(), derivative
+forget_agra = ModelProbingDetector(
+    klm, ProgressiveEnsemble(), GradSimilarity(), derivative
 )
 param_grid_forget_agra = prefix_param_grid_detector(param_grid_klm)
 
-independent_agra = ModelBasedDetector(
+independent_agra = ModelProbingDetector(
     klm,
     IndependentEnsemble(
         StratifiedShuffleSplit(
@@ -243,12 +300,12 @@ independent_agra = ModelBasedDetector(
         n_jobs=-1,
         # in_the_bag=True,
     ),
-    LinearGradSimilarity(),
+    GradSimilarity(),
     "sum",
 )
 param_grid_independent_agra = prefix_param_grid_detector(param_grid_klm)
 
-oob_agra = ModelBasedDetector(
+oob_agra = ModelProbingDetector(
     klm,
     IndependentEnsemble(
         RepeatedStratifiedKFold(
@@ -258,12 +315,12 @@ oob_agra = ModelBasedDetector(
         ),
         n_jobs=-1,
     ),
-    LinearGradSimilarity(),
+    GradSimilarity(),
     "mean_oob",
 )
 param_grid_oob_agra = prefix_param_grid_detector(param_grid_klm)
 
-loss = ModelBasedDetector(klm, NoEnsemble(), "entropy", "sum")
+loss = ModelProbingDetector(klm, NoEnsemble(), "entropy", "sum")
 param_grid_loss = prefix_param_grid_detector(param_grid_klm)
 
 detectors_agra = [
@@ -284,7 +341,7 @@ detectors_baseline = [
 ]
 
 detectors_all = (
-    detectors_knn + detectors_klm + detectors_gb + detectors_agra + detectors_baseline
+    detectors_knn + detectors_klm + detectors_gb + detectors_agra + detectors_baseline + detectors_linearized_gb
 )
 
 baselines = ["gold", "white_gold", "silver", "wood", "none"]

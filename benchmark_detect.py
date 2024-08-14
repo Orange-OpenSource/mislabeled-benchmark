@@ -12,14 +12,20 @@ import numpy as np
 import scipy.sparse as sp
 from autocommit import autocommit
 from datasets import get_weak_datasets
-from define_models import detectors_agra, detectors_gb, detectors_klm, kernels
+from define_models import (
+    detectors_agra,
+    detectors_gb,
+    detectors_klm,
+    kernels,
+    detectors_linearized_gb,
+)
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import ParameterSampler
 
 parser = argparse.ArgumentParser(prog="Mislabeled exemples detection benchmark")
 parser.add_argument("--corruption", choices=["weak", "noise"], required=True)
-parser.add_argument("--mode", choices=["klm", "gb", "agra"], required=True)
+parser.add_argument("--mode", choices=["klm", "gb", "gb_linear", "agra"], required=True)
 parser.add_argument("--dataset", action="store", nargs="+", required=True)
 parser.add_argument(
     "--datasets_folder", default=os.path.join(os.path.expanduser("~"), "datasets")
@@ -59,6 +65,8 @@ if args.mode == "klm":
     detectors = detectors_klm
 elif args.mode == "gb":
     detectors = detectors_gb
+elif args.mode == "gb_linear":
+    detectors = detectors_linearized_gb
 elif args.mode == "agra":
     detectors = detectors_agra
 else:
