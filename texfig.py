@@ -1,3 +1,11 @@
+# Software Name : texfig
+# SPDX-FileCopyrightText: Copyright (c)
+# SPDX-License-Identifier: MIT
+#
+# This software is distributed under the MIT license,
+# see the "LICENSE.md" file for more details
+# or https://github.com/Orange-OpenSource/mislabeled-benchmark/blob/master/LICENSE.md
+
 """
 Utility to generate PGF vector files from Python's Matplotlib plots to use in LaTeX documents.
 
@@ -31,7 +39,8 @@ mpl.rcParams["pgf.preamble"] = "\n".join(
         r"\newcommand{\vect}[1]{#1}",
         # You can use dummy implementations, since your LaTeX document
         # will render these properly, anyway.
-    ])
+    ]
+)
 mpl.rcParams["text.latex.preamble"] = r"\usepackage{amsmath}"
 
 import matplotlib.pyplot as plt

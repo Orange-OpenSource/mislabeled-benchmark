@@ -1,5 +1,14 @@
+# Software Name : mislabeled-benchmark
+# SPDX-FileCopyrightText: Copyright (c) Orange Innovation
+# SPDX-License-Identifier: MIT
+#
+# This software is distributed under the MIT license,
+# see the "LICENSE.md" file for more details
+# or https://github.com/Orange-OpenSource/mislabeled-benchmark/blob/master/LICENSE.md
+
 import subprocess
-from filelock import  FileLock
+from filelock import FileLock
+
 
 def autocommit():
     lock = FileLock("gitlock.lock")
@@ -14,7 +23,9 @@ def autocommit():
 
         # saves the current state of the directory into branch
         try:
-            stash_msg = subprocess.check_output(["git", "stash"]).decode("ascii").strip()
+            stash_msg = (
+                subprocess.check_output(["git", "stash"]).decode("ascii").strip()
+            )
         except subprocess.CalledProcessError as e:
             print("git stash stdout output:\n", e.output)
             raise

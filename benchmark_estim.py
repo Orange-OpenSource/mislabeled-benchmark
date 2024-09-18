@@ -1,3 +1,11 @@
+# Software Name : mislabeled-benchmark
+# SPDX-FileCopyrightText: Copyright (c) Orange Innovation
+# SPDX-License-Identifier: MIT
+#
+# This software is distributed under the MIT license,
+# see the "LICENSE.md" file for more details
+# or https://github.com/Orange-OpenSource/mislabeled-benchmark/blob/master/LICENSE.md
+
 import argparse
 from functools import partial
 import json

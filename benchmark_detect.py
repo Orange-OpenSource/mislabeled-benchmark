@@ -1,3 +1,11 @@
+# Software Name : mislabeled-benchmark
+# SPDX-FileCopyrightText: Copyright (c) Orange Innovation
+# SPDX-License-Identifier: MIT
+#
+# This software is distributed under the MIT license,
+# see the "LICENSE.md" file for more details
+# or https://github.com/Orange-OpenSource/mislabeled-benchmark/blob/master/LICENSE.md
+
 import argparse
 from datetime import datetime
 import json
@@ -141,10 +149,16 @@ for dataset_name, dataset in weak_datasets.items():
 
         if args.restart_from != "":
             previous_json_path = os.path.join(
-                args.restart_from, args.corruption, detector_name, f"{dataset_name}.json"
+                args.restart_from,
+                args.corruption,
+                detector_name,
+                f"{dataset_name}.json",
             )
             previous_hdf5_path = os.path.join(
-                args.restart_from, args.corruption, detector_name, f"{dataset_name}.hdf5"
+                args.restart_from,
+                args.corruption,
+                detector_name,
+                f"{dataset_name}.hdf5",
             )
             try:
                 with open(previous_json_path, mode="r") as previous_json:
