@@ -190,8 +190,13 @@ datasets_ranked_by_time = [
 
 all_datasets = sorted(all_datasets, key=lambda x: datasets_ranked_by_time.index(x[0]))
 
+
 def get_weak_datasets(
-    cache_folder, corruption, datasets=datasets_ranked_by_time, seed=1
+    cache_folder,
+    corruption,
+    datasets=datasets_ranked_by_time,
+    seed=1,
+    calibration=False,
 ):
     weak_datasets = {}
     for name, fetch, preprocessing, kernel in all_datasets:
@@ -225,18 +230,35 @@ def get_weak_datasets(
                 stratify=weak_dataset["test"]["target"],
             )
 
+        splits = ["train", "validation", "test"]
+        if calibration:
+            weak_dataset["calibration"] = {}
+            (
+                weak_dataset["calibration"]["data"],
+                weak_dataset["validation"]["data"],
+                weak_dataset["calibration"]["target"],
+                weak_dataset["validation"]["target"],
+                weak_dataset["calibration"]["weak_targets"],
+                weak_dataset["validation"]["weak_targets"],
+            ) = train_test_split(
+                weak_dataset["validation"]["data"],
+                weak_dataset["validation"]["target"],
+                weak_dataset["validation"]["weak_targets"],
+                train_size=0.2,
+                random_state=seed,
+                stratify=weak_dataset["validation"]["target"],
+            )
+            splits += ["calibration"]
+
         if corruption == "weak":
-            weak_targets = [
-                weak_dataset[split]["weak_targets"]
-                for split in ["train", "validation", "test"]
-            ]
+            weak_targets = [weak_dataset[split]["weak_targets"] for split in splits]
             weak_targets = np.concatenate(weak_targets)
             wle = WeakLabelEncoder(random_state=seed).fit(weak_targets)
             soft_wle = WeakLabelEncoder(random_state=seed, method="soft").fit(
                 weak_targets
             )
 
-            for split in ["train", "validation", "test"]:
+            for split in splits:
                 weak_dataset[split]["noisy_target"] = wle.transform(
                     weak_dataset[split]["weak_targets"]
                 )
@@ -245,7 +267,7 @@ def get_weak_datasets(
                 )
 
         elif corruption == "noise":
-            for split in ["train", "validation", "test"]:
+            for split in splits:
                 weak_dataset[split]["noisy_target"] = make_label_noise(
                     weak_dataset[split]["target"],
                     "uniform",
@@ -258,7 +280,7 @@ def get_weak_datasets(
 
         if preprocessing is not None:
             preprocessing.fit(weak_dataset["train"]["data"])
-            for split in ["train", "validation", "test"]:
+            for split in splits:
                 weak_dataset[split]["raw"] = weak_dataset[split]["data"]
                 weak_dataset[split]["data"] = preprocessing.transform(
                     weak_dataset[split]["raw"]

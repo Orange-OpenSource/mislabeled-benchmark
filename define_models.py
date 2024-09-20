@@ -3,6 +3,9 @@
 import os
 from functools import partial
 
+from sklearn import clone
+from sklearn.base import is_classifier
+from sklearn.calibration import CalibratedClassifierCV, check_cv
 from sklearn.preprocessing import OneHotEncoder
 
 from catboost import CatBoostClassifier
@@ -64,6 +67,35 @@ def staged_fit_cat(estimator: CatBoostClassifier, X, y):
         shrinked = estimator.copy()
         shrinked.shrink(i + 1)
         yield shrinked
+
+
+@staged_fit.register(CalibratedClassifierCV)
+def staged_fit_cccv(calibrator, X, y):
+    """
+    Perform staged fitting for CalibratedClassifierCV.
+
+    Parameters
+    ----------
+    calibrator : CalibratedClassifierCV
+        The calibrated classifier to fit in stages.
+    X : array-like, shape (n_samples, n_features)
+        Training data.
+    y : array-like, shape (n_samples,)
+        Target values.
+
+    Yields
+    ------
+    cloned : CalibratedClassifierCV
+        A calibrated classifier fitted on a subset of the data.
+    """
+    estimator = calibrator.estimator
+    cv = check_cv(calibrator.cv, y=y, classifier=is_classifier(estimator))
+    train, test = next(cv.split(X, y, groups=None))
+    stages = staged_fit(estimator, X[train, :], y[train])
+    for stage in stages:
+        cloned = clone(calibrator)
+        cloned.set_params(cv="prefit", estimator=stage)
+        yield cloned.fit(X[test], y[test])
 
 
 ## DEFINITION FOR LINEAR DETECTORS
@@ -271,6 +303,21 @@ detectors_linearized_gb = [
     ),
 ]
 
+##CALIBRATION
+
+calibrated_aum = AreaUnderMargin(
+    CalibratedClassifierCV(klm, method="isotonic", ensemble=False)
+)
+param_grid_calibrated_aum = param_grid_prefix("estimator", param_grid_klm)
+
+detectors_calibrated = [
+    (
+        "klm_aum_calibrated",
+        calibrated_aum,
+        prefix_param_grid_detector(param_grid_calibrated_aum),
+    ),
+]
+
 
 ## AGRA SPECIFIC DETECTORS DEFINITION
 
@@ -341,7 +388,12 @@ detectors_baseline = [
 ]
 
 detectors_all = (
-    detectors_knn + detectors_klm + detectors_gb + detectors_agra + detectors_baseline + detectors_linearized_gb
+    detectors_knn
+    + detectors_klm
+    + detectors_gb
+    + detectors_agra
+    + detectors_baseline
+    + detectors_linearized_gb
 )
 
 baselines = ["gold", "white_gold", "silver", "wood", "none"]
