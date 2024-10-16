@@ -70,7 +70,8 @@ if not sys.warnoptions:
 
 
 detectors = [d for d in detectors_all if d[0] in args.detector]
-
+# detectors = args.detector
+print(detectors)
 
 def random_trust_scores(seed, size):
     ts = np.arange(size)

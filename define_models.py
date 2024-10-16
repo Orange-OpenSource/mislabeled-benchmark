@@ -50,7 +50,7 @@ from mislabeled.probe import (
     Probabilities,
     Accuracy,
     Confidence,
-    CrossEntropy
+    CrossEntropy,
 )
 from mislabeled.probe._linear import linearize_linear_model
 from mislabeled.split import QuantileSplitter, ThresholdSplitter
@@ -476,11 +476,11 @@ detectors_calibrated = [
     #     gb_aumcal,
     #     param_grid_gb_aumcal,
     # ),
-    # (
-    #     "klm_cleanlab_calibrated",
-    #     klm_cleanlabcal,
-    #     param_grid_klm_cleanlabcal,
-    # ),
+    (
+        "klm_cleanlab_calibrated",
+        klm_cleanlabcal,
+        param_grid_klm_cleanlabcal,
+    ),
     (
         "klm_consensus_calibrated",
         klm_consensus_calibrated,
@@ -491,6 +491,10 @@ detectors_calibrated = [
         klm_smallloss_calibrated,
         param_grid_klm_smallloss_calibrated,
     ),
+]
+
+detectors_calibrated_noisy = [
+    (f"{n}_noisy", d, g) for (n, d, g) in detectors_calibrated
 ]
 
 klm_aum_adjusted = AreaUnderMargin(klm)
@@ -667,6 +671,7 @@ detectors_all = (
     + detectors_baseline
     + detectors_linearized_gb
     + detectors_calibrated
+    + detectors_calibrated_noisy
     + detectors_adjusted
 )
 
