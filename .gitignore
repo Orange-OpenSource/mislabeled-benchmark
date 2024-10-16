@@ -1,2 +1,5 @@
 detect
 estim
+figures
+.DS_Store
+*.pyc

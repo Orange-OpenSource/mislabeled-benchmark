@@ -33,6 +33,7 @@ from sklearn.model_selection import ParameterGrid, ParameterSampler
 
 from mislabeled.handle import FilterClassifier
 from mislabeled.split import PerClassSplitter
+from relplot import smECE, multiclass_logits_to_confidences
 
 seed = 1
 
@@ -352,6 +353,18 @@ for dataset_name, dataset in weak_datasets.items():
                     bacc_test = balanced_accuracy_score(y_test, y_pred_test)
                     kappa_test = cohen_kappa_score(y_test, y_pred_test)
                     logl_test = log_loss(y_test, y_proba_test)
+
+                    # top-label calibration metrics
+                    for split, y_proba, y in zip(
+                        ["noisy_val", "val", "test"],
+                        [y_proba_val, y_proba_val, y_proba_test],
+                        [y_noisy_val, y_val, y_test],
+                    ):
+                        y_proba_max, agreement = multiclass_logits_to_confidences(
+                            y_proba, y, probs=True
+                        )
+                        ece = smECE(f=y_proba_max, y=agreement)
+                        stats[f"ece_{split}"] = ece
 
                     end = time.perf_counter()
 

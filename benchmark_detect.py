@@ -19,6 +19,7 @@ from define_models import (
     kernels,
     detectors_linearized_gb,
     detectors_calibrated,
+    detectors_adjusted,
 )
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
@@ -27,13 +28,16 @@ from sklearn.model_selection import ParameterSampler, PredefinedSplit
 parser = argparse.ArgumentParser(prog="Mislabeled exemples detection benchmark")
 parser.add_argument("--corruption", choices=["weak", "noise"], required=True)
 parser.add_argument(
-    "--mode", choices=["klm", "gb", "gb_linear", "agra", "calibration"], required=True
+    "--mode",
+    choices=["klm", "gb", "gb_linear", "agra", "calibration", "adjust"],
+    required=True,
 )
 parser.add_argument("--dataset", action="store", nargs="+", required=True)
 parser.add_argument(
     "--datasets_folder", default=os.path.join(os.path.expanduser("~"), "datasets")
 )
 parser.add_argument("--output", default="./output")
+parser.add_argument("--calibration", default="clean")
 
 parser.add_argument("--restart_from", default="")
 
@@ -73,6 +77,8 @@ elif args.mode == "gb_linear":
     detectors = detectors_linearized_gb
 elif args.mode == "calibration":
     detectors = detectors_calibrated
+elif args.mode == "adjust":
+    detectors = detectors_adjusted
 elif args.mode == "agra":
     detectors = detectors_agra
 else:
@@ -83,77 +89,44 @@ os.makedirs(args.output, exist_ok=True)
 for dataset_name, dataset in weak_datasets.items():
     (
         X_train,
-        X_calib,
         X_val,
         X_test,
         y_train,
-        y_calib,
         y_val,
         y_test,
         y_noisy_train,
-        y_noisy_calib,
         y_noisy_val,
         y_noisy_test,
         y_soft_train,
-        y_soft_calib,
         y_soft_val,
         y_soft_test,
     ) = (
         dataset["train"]["data"],
-        dataset["calibration"]["data"],
         dataset["validation"]["data"],
         dataset["test"]["data"],
         dataset["train"]["target"],
-        dataset["calibration"]["target"],
         dataset["validation"]["target"],
         dataset["test"]["target"],
         dataset["train"]["noisy_target"],
-        dataset["calibration"]["noisy_target"],
         dataset["validation"]["noisy_target"],
         dataset["test"]["noisy_target"],
         dataset["train"]["soft_targets"],
-        dataset["calibration"]["soft_targets"],
         dataset["validation"]["soft_targets"],
         dataset["test"]["soft_targets"],
     )
-    
+
     if args.mode == "calibration":
         (
-            X_train,
-            X_val,
-            X_test,
-            y_train,
+            X_calib,
             y_calib,
-            y_val,
-            y_test,
-            y_noisy_train,
             y_noisy_calib,
-            y_noisy_val,
-            y_noisy_test,
-            y_soft_train,
             y_soft_calib,
-            y_soft_val,
-            y_soft_test,
         ) = (
-            dataset["train"]["data"],
             dataset["calibration"]["data"],
-            dataset["validation"]["data"],
-            dataset["test"]["data"],
-            dataset["train"]["target"],
             dataset["calibration"]["target"],
-            dataset["validation"]["target"],
-            dataset["test"]["target"],
-            dataset["train"]["noisy_target"],
             dataset["calibration"]["noisy_target"],
-            dataset["validation"]["noisy_target"],
-            dataset["test"]["noisy_target"],
-            dataset["train"]["soft_targets"],
             dataset["calibration"]["soft_targets"],
-            dataset["validation"]["soft_targets"],
-            dataset["test"]["soft_targets"],
         )
-    
-    
 
     # FASTER TRAINING
     X_train = X_train.astype(np.float32)
@@ -163,16 +136,15 @@ for dataset_name, dataset in weak_datasets.items():
     if sp.issparse(X_train):
         if args.mode == "calibration":
             calibration_split = np.concatenate(
-                (
-                    -np.ones(X_train[y_noisy_train != -1].shape[0]),
-                    np.zeros(X_calib[y_noisy_calib != -1].shape[0]),
-                )
+                (-np.ones(X_train.shape[0]), np.zeros(X_calib.shape[0]))
             )
-            print(calibration_split.shape, X_train.shape, X_calib.shape)
 
             X_train = sp.vstack((X_train, X_calib))
             y_train = np.concatenate((y_train, y_calib))
-            y_noisy_train = np.concatenate((y_noisy_train, y_noisy_calib))
+            if args.calibration == "noisy":
+                y_noisy_train = np.concatenate((y_noisy_train, y_noisy_calib))
+            else:
+                y_noisy_train = np.concatenate((y_noisy_train, y_calib))
             y_soft_train = np.vstack((y_soft_train, y_soft_calib))
 
         unlabeled = y_noisy_train == -1
@@ -185,13 +157,17 @@ for dataset_name, dataset in weak_datasets.items():
         if args.mode == "calibration":
             calibration_split = np.concatenate(
                 (
-                    -np.ones(X_train[y_noisy_train != -1].shape[0]),
-                    np.zeros(X_calib[y_noisy_calib != -1].shape[0]),
+                    -np.ones(X_train.shape[0]),
+                    np.zeros(X_calib.shape[0]),
                 )
             )
+
             X_train = np.vstack((X_train, X_calib))
             y_train = np.concatenate((y_train, y_calib))
-            y_noisy_train = np.concatenate((y_noisy_train, y_noisy_calib))
+            if args.calibration == "noisy":
+                y_noisy_train = np.concatenate((y_noisy_train, y_noisy_calib))
+            else:
+                y_noisy_train = np.concatenate((y_noisy_train, y_calib))
             y_soft_train = np.vstack((y_soft_train, y_soft_calib))
 
         unlabeled = y_noisy_train == -1
@@ -201,6 +177,9 @@ for dataset_name, dataset in weak_datasets.items():
         X_test = np.asfortranarray(X_test)
 
     y_train = np.array(y_train)
+
+    if args.mode == "calibration":
+        calibration_split = calibration_split[~unlabeled]
 
     coverage = 1 - np.mean(unlabeled)
 
@@ -215,6 +194,12 @@ for dataset_name, dataset in weak_datasets.items():
     n_classes = len(labels)
 
     for detector_name, detector_base, param_grid_detector in detectors:
+
+        detector_name = (
+            detector_name + "_noisy"
+            if args.calibration == "noisy" and "calibrated" in detector_name
+            else detector_name
+        )
 
         # TODO: CLEAN (sadge)
         if "kernel" in detector_base.base_model.get_params():
@@ -278,6 +263,7 @@ for dataset_name, dataset in weak_datasets.items():
                 detector.set_params(
                     **{"base_model__cv": PredefinedSplit(calibration_split)}
                 )
+
             trust_scores = detector.trust_score(
                 X_train_labeled, y_noisy_train[~unlabeled]
             )
@@ -338,6 +324,9 @@ for dataset_name, dataset in weak_datasets.items():
             }
 
             results.append(res)
+
+            if args.mode == "calibration":
+                trust_scores = trust_scores[calibration_split == -1]
 
             dset = ts_store.create_dataset(
                 str(params_i), shape=trust_scores.shape, dtype=trust_scores.dtype

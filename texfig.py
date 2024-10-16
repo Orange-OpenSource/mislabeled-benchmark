@@ -15,8 +15,8 @@ default_width = 5.78853  # in inches
 TMLR_textwidth = 6.50127
 
 default_ratio = (sqrt(5.0) - 1.0) / 2.0  # golden mean
-mpl.rcParams["text.usetex"] = True
-mpl.rcParams["pgf.texsystem"] = "xelatex"
+# mpl.rcParams["text.usetex"] = True
+# mpl.rcParams["pgf.texsystem"] = "xelatex"
 mpl.rcParams["pgf.rcfonts"] = False
 mpl.rcParams["font.family"] = "serif"
 mpl.rcParams["font.sans-serif"] = []
@@ -32,7 +32,7 @@ mpl.rcParams["pgf.preamble"] = "\n".join(
         # You can use dummy implementations, since your LaTeX document
         # will render these properly, anyway.
     ])
-mpl.rcParams["text.latex.preamble"] = r"\usepackage{amsmath}"
+# mpl.rcParams["text.latex.preamble"] = r"\usepackage{amsmath}"
 
 import matplotlib.pyplot as plt
 
@@ -67,4 +67,4 @@ Save both a PDF and a PGF file with the given filename.
 
 def savefig(filename, *args, **kwargs):
     plt.savefig(filename + ".pdf", *args, **kwargs)
-    plt.savefig(filename + ".pgf", *args, **kwargs)
+    # plt.savefig(filename + ".pgf", *args, **kwargs)
