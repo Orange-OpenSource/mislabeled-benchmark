@@ -197,6 +197,7 @@ def get_weak_datasets(
     datasets=datasets_ranked_by_time,
     seed=1,
     calibration=False,
+    calibration_size=0.5,
 ):
     weak_datasets = {}
     for name, fetch, preprocessing, kernel in all_datasets:
@@ -232,22 +233,34 @@ def get_weak_datasets(
 
         splits = ["train", "validation", "test"]
         if calibration:
+            print(name, len(weak_dataset["validation"]["data"]))
             weak_dataset["calibration"] = {}
-            (
-                weak_dataset["calibration"]["data"],
-                weak_dataset["validation"]["data"],
-                weak_dataset["calibration"]["target"],
-                weak_dataset["validation"]["target"],
-                weak_dataset["calibration"]["weak_targets"],
-                weak_dataset["validation"]["weak_targets"],
-            ) = train_test_split(
-                weak_dataset["validation"]["data"],
-                weak_dataset["validation"]["target"],
-                weak_dataset["validation"]["weak_targets"],
-                train_size=0.2,
-                random_state=seed,
-                stratify=weak_dataset["validation"]["target"],
-            )
+            if calibration_size > len(weak_dataset["validation"]["data"]):
+                (
+                    weak_dataset["calibration"]["data"],
+                    weak_dataset["calibration"]["target"],
+                    weak_dataset["calibration"]["weak_targets"],
+                ) = (
+                    weak_dataset["validation"]["data"],
+                    weak_dataset["validation"]["target"],
+                    weak_dataset["validation"]["weak_targets"],
+                )
+            else:
+                (
+                    weak_dataset["calibration"]["data"],
+                    weak_dataset["validation"]["data"],
+                    weak_dataset["calibration"]["target"],
+                    weak_dataset["validation"]["target"],
+                    weak_dataset["calibration"]["weak_targets"],
+                    weak_dataset["validation"]["weak_targets"],
+                ) = train_test_split(
+                    weak_dataset["validation"]["data"],
+                    weak_dataset["validation"]["target"],
+                    weak_dataset["validation"]["weak_targets"],
+                    train_size=calibration_size,
+                    random_state=seed,
+                    stratify=weak_dataset["validation"]["target"],
+                )
             splits += ["calibration"]
 
         if corruption == "weak":

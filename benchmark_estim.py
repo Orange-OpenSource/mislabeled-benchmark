@@ -1,5 +1,4 @@
 import argparse
-from functools import partial
 import json
 import os
 import subprocess
@@ -8,6 +7,7 @@ import time
 import warnings
 from copy import deepcopy
 from datetime import datetime
+from functools import partial
 
 import h5py
 import numpy as np
@@ -18,10 +18,11 @@ from define_models import (
     baselines,
     classifiers,
     detectors_all,
+    kernels,
     param_grid_prefix,
     splitters,
-    kernels,
 )
+from relplot import multiclass_logits_to_confidences, smECE
 from sklearn.base import BaseEstimator, clone
 from sklearn.metrics import (
     accuracy_score,
@@ -33,7 +34,6 @@ from sklearn.model_selection import ParameterGrid, ParameterSampler
 
 from mislabeled.handle import FilterClassifier
 from mislabeled.split import PerClassSplitter
-from relplot import smECE, multiclass_logits_to_confidences
 
 seed = 1
 
@@ -60,7 +60,7 @@ print(f"I saved the working directory as (possibly detached) commit {commit_hash
 ## Not implemented
 
 if args.strategy == "relabel" and args.by_class:
-    raise NotImplementedError()
+    raise NotImplementedError
 
 ## SUPPRESS WARNINGS OF CONVERGENCE FOR SGD
 
@@ -69,9 +69,10 @@ if not sys.warnoptions:
     os.environ["PYTHONWARNINGS"] = "ignore"
 
 
-detectors = [d for d in detectors_all if d[0] in args.detector]
-# detectors = args.detector
+# detectors = [d for d in detectors_all if d[0] in args.detector]
+detectors = args.detector
 print(detectors)
+
 
 def random_trust_scores(seed, size):
     ts = np.arange(size)
@@ -80,10 +81,8 @@ def random_trust_scores(seed, size):
 
 
 class TrustScoreReader:
-
     def __init__(self, base_path, dataset, detector):
-
-        with open(os.path.join(base_path, detector, f"{dataset}.json"), mode="r") as f:
+        with open(os.path.join(base_path, detector, f"{dataset}.json")) as f:
             self.results_json = json.load(f)
         self.results_hdf5 = h5py.File(
             os.path.join(base_path, detector, f"{dataset_name}.hdf5"), "r"
@@ -190,7 +189,10 @@ for dataset_name, dataset in weak_datasets.items():
         kernel, param_grid_kernel = kernels[dataset["kernel"]]
         classifier.set_params(kernel=kernel)
 
-    for detector_name, *_ in detectors:
+    detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
+
+    for detector_name in detectors:
+        # for detector_name, *_ in detectors:
         final_output_dir = os.path.join(
             args.output, args.corruption, args.classifier, detector_name
         )
@@ -200,7 +202,8 @@ for dataset_name, dataset in weak_datasets.items():
 
         print(f"{timestamp}: handler for {dataset_name} | {detector_name}")
         if detector_name not in baselines:
-            splitter, param_grid_splitter = splitters[detector_name]
+            # splitter, param_grid_splitter = splitters[detector_name]
+            splitter, param_grid_splitter = splitters["_".join(detector_name.split("_")[:-1])]
             if args.by_class:
                 splitter = PerClassSplitter(splitter)
             if detector_name != "random":
@@ -224,7 +227,7 @@ for dataset_name, dataset in weak_datasets.items():
                 f"{dataset_name}.json",
             )
             try:
-                with open(previous_json_path, mode="r") as previous_json:
+                with open(previous_json_path) as previous_json:
                     results = json.load(previous_json)
                 with open(
                     os.path.join(final_output_dir, f"{dataset_name}.json"), mode="w"
@@ -242,7 +245,6 @@ for dataset_name, dataset in weak_datasets.items():
         for params_i, params_classifier in enumerate(
             ParameterSampler(param_grid_classifier, 12 * args.n_sampling_estim)
         ):
-
             if detector_name in baselines:
                 model = clone(classifier)
                 model.set_params(**params_classifier)
@@ -261,7 +263,6 @@ for dataset_name, dataset in weak_datasets.items():
                 classifier_.set_params(**params_classifier)
 
                 if args.strategy == "filter":
-
                     model = FilterClassifier(
                         detector,
                         splitter,

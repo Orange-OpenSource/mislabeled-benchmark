@@ -1,5 +1,7 @@
 import subprocess
-from filelock import  FileLock
+
+from filelock import FileLock
+
 
 def autocommit():
     lock = FileLock("gitlock.lock")

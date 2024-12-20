@@ -4,11 +4,10 @@ Utility to generate PGF vector files from Python's Matplotlib plots to use in La
 Read more at https://github.com/knly/texfig
 """
 
-import matplotlib as mpl
-
 # mpl.use("pgf")
-
 from math import sqrt
+
+import matplotlib as mpl
 
 default_width = 5.78853  # in inches
 
@@ -35,7 +34,6 @@ mpl.rcParams["pgf.preamble"] = "\n".join(
 # mpl.rcParams["text.latex.preamble"] = r"\usepackage{amsmath}"
 
 import matplotlib.pyplot as plt
-
 
 """
 Returns a figure with an appropriate size and tight layout.

@@ -4,15 +4,13 @@ import os
 from functools import partial
 
 import numpy as np
+from catboost import CatBoostClassifier
+from scipy.stats import loguniform, uniform
 from sklearn import clone
 from sklearn.base import is_classifier
 from sklearn.calibration import CalibratedClassifierCV, check_cv
-from sklearn.preprocessing import OneHotEncoder
-
-from catboost import CatBoostClassifier
-from scipy.stats import loguniform, uniform
 from sklearn.kernel_approximation import RBFSampler
-from sklearn.linear_model import LogisticRegressionCV, SGDClassifier
+from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import (
     RandomizedSearchCV,
     RepeatedStratifiedKFold,
@@ -21,7 +19,9 @@ from sklearn.model_selection import (
 )
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 
+from mislabeled.aggregate import mean, oob
 from mislabeled.detect import ModelProbingDetector
 from mislabeled.detect.detectors import (
     AreaUnderMargin,
@@ -36,25 +36,25 @@ from mislabeled.detect.detectors import (
     VoSG,
 )
 from mislabeled.ensemble import (
+    AbstractEnsemble,
     IndependentEnsemble,
     LeaveOneOutEnsemble,
     NoEnsemble,
     ProgressiveEnsemble,
+    staged_fit,
 )
-from mislabeled.ensemble import staged_fit, AbstractEnsemble
 from mislabeled.probe import (
-    GradSimilarity,
-    linearize,
-    Adjust,
-    Margin,
-    Probabilities,
     Accuracy,
+    Adjust,
     Confidence,
     CrossEntropy,
+    GradSimilarity,
+    Margin,
+    Probabilities,
+    linearize,
 )
 from mislabeled.probe._linear import linearize_linear_model
 from mislabeled.split import QuantileSplitter, ThresholdSplitter
-from mislabeled.aggregate import oob, mean
 
 seed = 1
 
@@ -461,11 +461,11 @@ param_grid_klm_smallloss_calibrated = prefix_param_grid_detector(
 )
 
 detectors_calibrated = [
-    # (
-    #     "klm_aum_calibrated",
-    #     klm_aumcal,
-    #     param_grid_klm_aumcal,
-    # ),
+    (
+        "klm_aum_calibrated",
+        klm_aumcal,
+        param_grid_klm_aumcal,
+    ),
     # (
     #     "klm_forget_calibrated",
     #     klm_forget_cal,
@@ -587,11 +587,11 @@ detectors_adjusted = [
     #     klm_consensus_adjusted,
     #     param_grid_klm_consensus_adjusted,
     # ),
-    (
-        "klm_smallloss_adjusted",
-        klm_consensus_adjusted,
-        param_grid_klm_consensus_adjusted,
-    ),
+    # (
+    #     "klm_smallloss_adjusted",
+    #     klm_consensus_adjusted,
+    #     param_grid_klm_consensus_adjusted,
+    # ),
 ]
 
 

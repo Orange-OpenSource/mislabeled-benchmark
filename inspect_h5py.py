@@ -6,11 +6,9 @@ import os
 import h5py
 import numpy as np
 
-from datasets import datasets_ranked_by_time
-
 # %%
 
-base_path = os.path.join(os.path.expanduser("~"), f"output/detect/noise")
+base_path = os.path.join(os.path.expanduser("~"), "output/detect/noise")
 
 # %%
 detectors = []

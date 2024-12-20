@@ -3,3 +3,6 @@ estim
 figures
 .DS_Store
 *.pyc
+*venv
+ijcnn*
+archives

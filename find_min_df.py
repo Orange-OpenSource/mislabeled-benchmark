@@ -1,19 +1,19 @@
 import argparse
+import os
 import sys
 import time
 import warnings
-from sklearn import clone
-from sklearn.metrics import log_loss
-from sklearn.linear_model import SGDClassifier
+
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.sparse as sp
 from autocommit import autocommit
 from datasets import get_weak_datasets
 from define_models import klm, param_grid_klm
+from sklearn import clone
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import log_loss
 from sklearn.model_selection import PredefinedSplit, RandomizedSearchCV
-import numpy as np
-import scipy.sparse as sp
-import os
-import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(prog="Tuning min_df")
 parser.add_argument(

@@ -1,11 +1,11 @@
 import argparse
-from datetime import datetime
 import json
 import os
 import subprocess
 import sys
 import time
 import warnings
+from datetime import datetime
 
 import h5py
 import numpy as np
@@ -13,13 +13,13 @@ import scipy.sparse as sp
 from autocommit import autocommit
 from datasets import get_weak_datasets
 from define_models import (
+    detectors_adjusted,
     detectors_agra,
+    detectors_calibrated,
     detectors_gb,
     detectors_klm,
-    kernels,
     detectors_linearized_gb,
-    detectors_calibrated,
-    detectors_adjusted,
+    kernels,
 )
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
@@ -37,7 +37,9 @@ parser.add_argument(
     "--datasets_folder", default=os.path.join(os.path.expanduser("~"), "datasets")
 )
 parser.add_argument("--output", default="./output")
+
 parser.add_argument("--calibration", default="clean")
+parser.add_argument("--calibration_size", default=100, type=int)
 
 parser.add_argument("--restart_from", default="")
 
@@ -66,6 +68,7 @@ weak_datasets = get_weak_datasets(
     seed=seed,
     datasets=args.dataset,
     calibration=args.mode == "calibration",
+    calibration_size=args.calibration_size,
 )
 
 
@@ -194,10 +197,15 @@ for dataset_name, dataset in weak_datasets.items():
     n_classes = len(labels)
 
     for detector_name, detector_base, param_grid_detector in detectors:
-
         detector_name = (
             detector_name + "_noisy"
             if args.calibration == "noisy" and "calibrated" in detector_name
+            else detector_name
+        )
+
+        detector_name = (
+            detector_name + "_" + str(args.calibration_size)
+            if "calibrated" in detector_name
             else detector_name
         )
 
@@ -226,7 +234,7 @@ for dataset_name, dataset in weak_datasets.items():
                 f"{dataset_name}.hdf5",
             )
             try:
-                with open(previous_json_path, mode="r") as previous_json:
+                with open(previous_json_path) as previous_json:
                     results = json.load(previous_json)
                 with open(
                     os.path.join(final_output_dir, f"{dataset_name}.json"), mode="w"
@@ -260,9 +268,7 @@ for dataset_name, dataset in weak_datasets.items():
             detector = clone(detector_base).set_params(**params)
 
             if args.mode == "calibration":
-                detector.set_params(
-                    **{"base_model__cv": PredefinedSplit(calibration_split)}
-                )
+                detector.set_params(base_model__cv=PredefinedSplit(calibration_split))
 
             trust_scores = detector.trust_score(
                 X_train_labeled, y_noisy_train[~unlabeled]
