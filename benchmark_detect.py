@@ -66,7 +66,7 @@ else:
 
 os.makedirs(args.output, exist_ok=True)
 
-for dataset_name, dataset in weak_datasets.items():
+for dataset_name, dataset in weak_datasets:
     (
         X_train,
         X_val,
@@ -127,7 +127,6 @@ for dataset_name, dataset in weak_datasets.items():
     n_classes = len(labels)
 
     for detector_name, detector_base, param_grid_detector in detectors:
-
         # TODO: CLEAN (sadge)
         if "kernel" in detector_base.base_model.get_params():
             kernel, param_grid_kernel = kernels[dataset["kernel"]]
@@ -141,10 +140,16 @@ for dataset_name, dataset in weak_datasets.items():
 
         if args.restart_from != "":
             previous_json_path = os.path.join(
-                args.restart_from, args.corruption, detector_name, f"{dataset_name}.json"
+                args.restart_from,
+                args.corruption,
+                detector_name,
+                f"{dataset_name}.json",
             )
             previous_hdf5_path = os.path.join(
-                args.restart_from, args.corruption, detector_name, f"{dataset_name}.hdf5"
+                args.restart_from,
+                args.corruption,
+                detector_name,
+                f"{dataset_name}.hdf5",
             )
             try:
                 with open(previous_json_path, mode="r") as previous_json:

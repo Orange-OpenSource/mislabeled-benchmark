@@ -194,7 +194,6 @@ all_datasets = sorted(all_datasets, key=lambda x: datasets_ranked_by_time.index(
 def get_weak_datasets(
     cache_folder, corruption, datasets=datasets_ranked_by_time, seed=1
 ):
-    weak_datasets = {}
     for name, fetch, preprocessing, kernel in all_datasets:
         if name not in datasets:
             continue
@@ -265,6 +264,5 @@ def get_weak_datasets(
                     weak_dataset[split]["raw"]
                 )
         weak_dataset["kernel"] = kernel
-        weak_datasets[name] = weak_dataset
 
-    return weak_datasets
+        yield (name, weak_dataset)
