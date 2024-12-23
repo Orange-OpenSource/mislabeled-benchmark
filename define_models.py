@@ -11,13 +11,13 @@ from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedShuffleSp
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 
-from mislabeled.detect import ModelBasedDetector
+from mislabeled.detect import ModelProbingDetector
 from mislabeled.detect.detectors import (
     AreaUnderMargin,
     ConfidentLearning,
     ConsensusConsistency,
     ForgetScores,
-    InfluenceDetector,
+    SelfInfluenceDetector,
     LinearVoSG,
     RepresenterDetector,
     SmallLoss,
@@ -31,7 +31,7 @@ from mislabeled.ensemble import (
     ProgressiveEnsemble,
 )
 from mislabeled.ensemble._progressive import staged_fit
-from mislabeled.probe import LinearGradSimilarity
+from mislabeled.probe import GradSimilarity
 from mislabeled.split import QuantileSplitter, ThresholdSplitter
 
 seed = 1
@@ -122,7 +122,7 @@ classifiers = {
 
 ## DETECTORS DEFINITION
 
-knn_loo = ModelBasedDetector(knn, LeaveOneOutEnsemble(n_jobs=-1), "accuracy", "sum")
+knn_loo = ModelProbingDetector(knn, LeaveOneOutEnsemble(n_jobs=-1), "accuracy", "sum")
 param_grid_knn_loo = prefix_param_grid_detector(param_grid_knn)
 
 gb_aum = AreaUnderMargin(gb)
@@ -161,7 +161,7 @@ param_grid_gb_consensus = prefix_param_grid_detector(param_grid_gb)
 klm_consensus = ConsensusConsistency(klm, n_jobs=-1, random_state=seed)
 param_grid_klm_consensus = prefix_param_grid_detector(param_grid_klm)
 
-influence = InfluenceDetector(klm)
+influence = SelfInfluenceDetector(klm)
 param_grid_influence = prefix_param_grid_detector(param_grid_klm)
 
 klm_representer = RepresenterDetector(klm)
@@ -176,7 +176,7 @@ param_grid_gb_vosg = prefix_param_grid_detector(param_grid_gb)
 klm_vosg = LinearVoSG(klm)
 param_grid_klm_vosg = prefix_param_grid_detector(param_grid_klm)
 
-agra = ModelBasedDetector(klm, NoEnsemble(), LinearGradSimilarity(), "sum")
+agra = ModelProbingDetector(klm, NoEnsemble(), GradSimilarity(), "sum")
 param_grid_klm_agra = param_grid_klm.copy()
 param_grid_klm_agra["sgd__fit_intercept"] = [True, False]
 param_grid_agra = prefix_param_grid_detector(param_grid_klm_agra)
@@ -197,11 +197,11 @@ detectors_klm = [
     ("klm_forget", klm_forget, param_grid_klm_forget),
     ("klm_cleanlab", klm_cleanlab, param_grid_klm_cleanlab),
     ("klm_consensus", klm_consensus, param_grid_klm_consensus),
-    ("influence", influence, param_grid_influence),
+    ("klm_influence", influence, param_grid_influence),
     ("klm_representer", klm_representer, param_grid_representer),
-    ("tracin", tracin, param_grid_tracin),
+    ("klm_tracin", tracin, param_grid_tracin),
     ("klm_vosg", klm_vosg, param_grid_klm_vosg),
-    ("agra", agra, param_grid_agra),
+    ("klm_agra", agra, param_grid_agra),
     ("klm_smallloss", klm_small_loss, param_grid_klm_small_loss),
 ]
 
@@ -217,8 +217,8 @@ detectors_gb = [
 
 ## AGRA SPECIFIC DETECTORS DEFINITION
 
-progressive_agra = ModelBasedDetector(
-    klm, ProgressiveEnsemble(), LinearGradSimilarity(), "sum"
+progressive_agra = ModelProbingDetector(
+    klm, ProgressiveEnsemble(), GradSimilarity(), "sum"
 )
 param_grid_progressive_agra = prefix_param_grid_detector(param_grid_klm)
 
@@ -227,12 +227,12 @@ def derivative(scores, masks):
     return scores[:, :, -1] - scores[:, :, 0]
 
 
-forget_agra = ModelBasedDetector(
-    klm, ProgressiveEnsemble(), LinearGradSimilarity(), derivative
+forget_agra = ModelProbingDetector(
+    klm, ProgressiveEnsemble(), GradSimilarity(), derivative
 )
 param_grid_forget_agra = prefix_param_grid_detector(param_grid_klm)
 
-independent_agra = ModelBasedDetector(
+independent_agra = ModelProbingDetector(
     klm,
     IndependentEnsemble(
         StratifiedShuffleSplit(
@@ -243,12 +243,12 @@ independent_agra = ModelBasedDetector(
         n_jobs=-1,
         # in_the_bag=True,
     ),
-    LinearGradSimilarity(),
+    GradSimilarity(),
     "sum",
 )
 param_grid_independent_agra = prefix_param_grid_detector(param_grid_klm)
 
-oob_agra = ModelBasedDetector(
+oob_agra = ModelProbingDetector(
     klm,
     IndependentEnsemble(
         RepeatedStratifiedKFold(
@@ -258,12 +258,12 @@ oob_agra = ModelBasedDetector(
         ),
         n_jobs=-1,
     ),
-    LinearGradSimilarity(),
+    GradSimilarity(),
     "mean_oob",
 )
 param_grid_oob_agra = prefix_param_grid_detector(param_grid_klm)
 
-loss = ModelBasedDetector(klm, NoEnsemble(), "entropy", "sum")
+loss = ModelProbingDetector(klm, NoEnsemble(), "entropy", "sum")
 param_grid_loss = prefix_param_grid_detector(param_grid_klm)
 
 detectors_agra = [
