@@ -14,14 +14,7 @@ import numpy as np
 import scipy.sparse as sp
 from autocommit import autocommit
 from datasets import get_weak_datasets
-from define_models import (
-    baselines,
-    classifiers,
-    detectors_all,
-    kernels,
-    param_grid_prefix,
-    splitters,
-)
+from define_models import baselines, classifiers, kernels, param_grid_prefix, splitters
 from relplot import multiclass_logits_to_confidences, smECE
 from sklearn.base import BaseEstimator, clone
 from sklearn.metrics import (
@@ -41,7 +34,6 @@ parser = argparse.ArgumentParser(prog="Mislabeled exemples detection benchmark")
 parser.add_argument("--corruption", choices=["weak", "noise"], required=True)
 parser.add_argument("--classifier", choices=["klm", "gb"], required=True)
 parser.add_argument("--dataset", action="store", nargs="+", required=True)
-parser.add_argument("--detector", action="store", nargs="+", required=True)
 parser.add_argument(
     "--datasets_folder", default=os.path.join(os.path.expanduser("~"), "datasets")
 )
@@ -67,11 +59,6 @@ if args.strategy == "relabel" and args.by_class:
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
-
-
-# detectors = [d for d in detectors_all if d[0] in args.detector]
-detectors = args.detector
-print(detectors)
 
 
 def random_trust_scores(seed, size):
@@ -203,7 +190,9 @@ for dataset_name, dataset in weak_datasets.items():
         print(f"{timestamp}: handler for {dataset_name} | {detector_name}")
         if detector_name not in baselines:
             # splitter, param_grid_splitter = splitters[detector_name]
-            splitter, param_grid_splitter = splitters["_".join(detector_name.split("_")[:-1])]
+            splitter, param_grid_splitter = splitters[
+                "_".join(detector_name.split("_")[:-1])
+            ]
             if args.by_class:
                 splitter = PerClassSplitter(splitter)
             if detector_name != "random":
@@ -213,7 +202,7 @@ for dataset_name, dataset in weak_datasets.items():
                         dataset_name,
                         detector_name,
                     )
-                except:
+                except:  # noqa: E722
                     print("skipped (reading hdf5 likely failed)")
                     continue
 
@@ -235,7 +224,7 @@ for dataset_name, dataset in weak_datasets.items():
                     json.dump(results, output_file)
                 to_skip = len(results)
 
-            except:
+            except:  # noqa: E722
                 print(f"I could not restart from specified path {previous_json_path}")
                 results = []
         else:

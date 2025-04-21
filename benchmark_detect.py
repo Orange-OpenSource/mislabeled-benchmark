@@ -39,7 +39,7 @@ parser.add_argument(
 parser.add_argument("--output", default="./output")
 
 parser.add_argument("--calibration", default="clean")
-parser.add_argument("--calibration_size", default=100, type=int)
+parser.add_argument("--calibration_size", default=0.2, type=float)
 
 parser.add_argument("--restart_from", default="")
 
@@ -246,7 +246,7 @@ for dataset_name, dataset in weak_datasets.items():
                         previous_hdf5.copy(
                             previous_hdf5[f"trust_scores/{i}"], f["trust_scores"]
                         )
-            except:
+            except:  # noqa: E722
                 results = []
         else:
             results = []

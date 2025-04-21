@@ -213,7 +213,7 @@ def get_weak_datasets(
                 name, split="validation", cache_folder=cache_folder
             )
         # otherwise split test set in two
-        except:
+        except:  # noqa: E722
             weak_dataset["validation"] = {}
             (
                 weak_dataset["validation"]["data"],
