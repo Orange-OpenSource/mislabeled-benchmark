@@ -37,7 +37,6 @@ parser.add_argument("--dataset", action="store", nargs="+", required=True)
 parser.add_argument(
     "--datasets_folder", default=os.path.join(os.path.expanduser("~"), "datasets")
 )
-
 parser.add_argument("--output", default="./output")
 parser.add_argument("--ts_path", help="Folder where trust scores are stored")
 parser.add_argument("--restart_from", default="")
@@ -177,8 +176,9 @@ for dataset_name, dataset in weak_datasets.items():
         classifier.set_params(kernel=kernel)
 
     detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
+    detectors = detectors + ["none", "silver", "gold"]
 
-    for detector_name in detectors:
+    for detector_name in ["klm_smallloss", "klm_aum", "klm_cleanlab", "klm_consensus"]:
         # for detector_name, *_ in detectors:
         final_output_dir = os.path.join(
             args.output, args.corruption, args.classifier, detector_name
@@ -191,7 +191,7 @@ for dataset_name, dataset in weak_datasets.items():
         if detector_name not in baselines:
             # splitter, param_grid_splitter = splitters[detector_name]
             splitter, param_grid_splitter = splitters[
-                "_".join(detector_name.split("_")[:-1])
+                "_".join(detector_name.split("_")[:2])
             ]
             if args.by_class:
                 splitter = PerClassSplitter(splitter)
@@ -300,6 +300,8 @@ for dataset_name, dataset in weak_datasets.items():
                         model.fit(X_train_labeled, y_train[~unlabeled])
                     elif detector_name == "silver":
                         model.fit(X_train[clean, :], y_noisy_train[clean])
+                    elif detector_name == "none":
+                        model.fit(X_train_labeled, y_noisy_train[~unlabeled])
                     elif detector_name == "wood":
                         rng = np.random.RandomState(seed)
                         y_wood_train = y_noisy_train.copy()

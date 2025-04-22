@@ -6,16 +6,12 @@ from functools import partial
 import numpy as np
 from catboost import CatBoostClassifier
 from scipy.stats import loguniform, uniform
-from sklearn import clone
-from sklearn.base import is_classifier
-from sklearn.calibration import CalibratedClassifierCV, check_cv
 from sklearn.kernel_approximation import RBFSampler
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import (
     RandomizedSearchCV,
     RepeatedStratifiedKFold,
     StratifiedShuffleSplit,
-    cross_validate,
 )
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
@@ -36,7 +32,6 @@ from mislabeled.detect.detectors import (
     FiniteDiffVoG,
 )
 from mislabeled.ensemble import (
-    AbstractEnsemble,
     IndependentEnsemble,
     LeaveOneOutEnsemble,
     NoEnsemble,
@@ -78,35 +73,6 @@ def staged_fit_cat(estimator: CatBoostClassifier, X, y):
         shrinked = estimator.copy()
         shrinked.shrink(i + 1)
         yield shrinked
-
-
-@staged_fit.register(CalibratedClassifierCV)
-def staged_fit_cccv(calibrator, X, y):
-    """
-    Perform staged fitting for CalibratedClassifierCV.
-
-    Parameters
-    ----------
-    calibrator : CalibratedClassifierCV
-        The calibrated classifier to fit in stages.
-    X : array-like, shape (n_samples, n_features)
-        Training data.
-    y : array-like, shape (n_samples,)
-        Target values.
-
-    Yields
-    ------
-    cloned : CalibratedClassifierCV
-        A calibrated classifier fitted on a subset of the data.
-    """
-    estimator = calibrator.estimator
-    cv = check_cv(calibrator.cv, y=y, classifier=is_classifier(estimator))
-    train, test = next(cv.split(X, y, groups=None))
-    stages = staged_fit(estimator, X[train, :], y[train])
-    for stage in stages:
-        cloned = clone(calibrator)
-        cloned.set_params(cv="prefit", estimator=stage)
-        yield cloned.fit(X[test], y[test])
 
 
 ## DEFINITION FOR LINEAR DETECTORS
@@ -234,22 +200,32 @@ param_grid_klm_consensus = prefix_param_grid_detector(param_grid_klm)
 influence = SelfInfluenceDetector(klm)
 param_grid_influence = prefix_param_grid_detector(param_grid_klm)
 
+gb_influence = SelfInfluenceDetector(gb)
+
 klm_representer = RepresenterDetector(klm)
 param_grid_representer = prefix_param_grid_detector(param_grid_klm)
+
+gb_representer = RepresenterDetector(gb)
 
 tracin = TracIn(klm)
 param_grid_tracin = prefix_param_grid_detector(param_grid_klm)
 
-gb_vosg = FiniteDiffVoG(gb, n_directions=100, steps=5, random_state=seed)
-param_grid_gb_vosg = prefix_param_grid_detector(param_grid_gb)
+gb_tracin = TracIn(gb, steps=10)
+
+gb_fd_vosg = FiniteDiffVoG(gb, n_directions=100, steps=5, random_state=seed)
+param_grid_gb_fd_vosg = prefix_param_grid_detector(param_grid_gb)
 
 klm_vosg = VoLG(klm)
 param_grid_klm_vosg = prefix_param_grid_detector(param_grid_klm)
+
+gb_vosg = VoLG(gb, steps=10)
 
 agra = ModelProbingDetector(klm, NoEnsemble(), GradSimilarity(), "sum")
 param_grid_klm_agra = param_grid_klm.copy()
 param_grid_klm_agra["sgd__fit_intercept"] = [True, False]
 param_grid_agra = prefix_param_grid_detector(param_grid_klm_agra)
+
+gb_agra = ModelProbingDetector(gb, NoEnsemble(), GradSimilarity(), "sum")
 
 gb_small_loss = SmallLoss(gb)
 param_grid_gb_small_loss = prefix_param_grid_detector(param_grid_gb)
@@ -263,297 +239,34 @@ detectors_knn = [
 ]
 
 detectors_klm = [
-    # ("klm_aum", klm_aum, param_grid_klm_aum),
+    ("klm_aum", klm_aum, param_grid_klm_aum),
     # ("klm_forget", klm_forget, param_grid_klm_forget),
-    # ("klm_cleanlab", klm_cleanlab, param_grid_klm_cleanlab),
+    ("klm_cleanlab", klm_cleanlab, param_grid_klm_cleanlab),
     ("klm_consensus", klm_consensus, param_grid_klm_consensus),
-    # ("influence", influence, param_grid_influence),
+    # ("klm_influence", influence, param_grid_influence),
     # ("klm_representer", klm_representer, param_grid_representer),
-    # ("tracin", tracin, param_grid_tracin),
+    # ("klm_tracin", tracin, param_grid_tracin),
     # ("klm_vosg", klm_vosg, param_grid_klm_vosg),
-    # ("agra", agra, param_grid_agra),
+    # ("klm_agra", agra, param_grid_agra),
     ("klm_smallloss", klm_small_loss, param_grid_klm_small_loss),
 ]
 
 detectors_gb = [
     # ("gb_aum", gb_aum, param_grid_gb_aum),
     # ("gb_forget", gb_forget, param_grid_gb_forget),
-    # ("sgb_forget", sgb_forget, param_grid_sgb_forget),
     # ("gb_cleanlab", gb_cleanlab, param_grid_gb_cleanlab),
     # ("gb_consensus", gb_consensus, param_grid_gb_consensus),
-    # ("gb_vosg", gb_vosg, param_grid_gb_vosg),
+    # ("gb_influence", gb_influence,  prefix_param_grid_detector(param_grid_gb)),
+    # ("gb_representer", gb_representer,  prefix_param_grid_detector(param_grid_gb)),
+    # ("gb_tracin", gb_tracin,  prefix_param_grid_detector(param_grid_gb)),
+    # ("gb_vosg", gb_vosg, prefix_param_grid_detector(param_grid_gb)),
+    # ("gb_fd_vosg", gb_fd_vosg, param_grid_gb_fd_vosg),
     # ("gb_smallloss", gb_small_loss, param_grid_gb_small_loss),
+    # ("gb_agra", gb_agra,  prefix_param_grid_detector(param_grid_gb)),
 ]
 
-param_grid_lin_gb = {
-    "iterations": [100],
-    "learning_rate": loguniform(1e-5, 1e-1),
-    "reg_lambda": uniform(0, 100),
-}
 
-##LINEARIZED GB
-
-lin_gb_vosg = VoLG(gb, steps=10)
-lin_gb_tracin = TracIn(gb, steps=10)
-lin_gb_agra = ModelProbingDetector(gb, NoEnsemble(), GradSimilarity(), "sum")
-
-lin_gb_influence = SelfInfluenceDetector(gb)
-lin_gb_representer = RepresenterDetector(gb)
-
-detectors_linearized_gb = [
-    ("lin_gb_vosg", lin_gb_vosg, prefix_param_grid_detector(param_grid_lin_gb)),
-    ("lin_gb_tracin", lin_gb_tracin, prefix_param_grid_detector(param_grid_lin_gb)),
-    ("lin_gb_agra", lin_gb_agra, prefix_param_grid_detector(param_grid_lin_gb)),
-    (
-        "lin_gb_influence",
-        lin_gb_influence,
-        prefix_param_grid_detector(param_grid_lin_gb),
-    ),
-    (
-        "lin_gb_representer",
-        lin_gb_representer,
-        prefix_param_grid_detector(param_grid_lin_gb),
-    ),
-]
-
-##CALIBRATION
-
-klm_aumcal = AreaUnderMargin(
-    CalibratedClassifierCV(klm, method="isotonic", ensemble=False)
-)
-param_grid_klm_aumcal = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-klm_forget_cal = ForgetScores(
-    CalibratedClassifierCV(klm, method="isotonic", ensemble=False)
-)
-param_grid_klm_forget_cal = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-
-class IndependentCalibratedEnsemble(AbstractEnsemble):
-    """Ensemble of bagged models.
-
-    Parameters
-    ----------
-    in_the_bag : bool, default=False
-        whether to also compute probe on in_the_bag examples
-    """
-
-    def __init__(
-        self,
-        ensemble_strategy,
-        *,
-        n_jobs=None,
-    ):
-        self.ensemble_strategy = ensemble_strategy
-        self.n_jobs = n_jobs
-
-    def probe_model(self, calibrator, X, y, probe):
-        n_samples = X.shape[0]
-
-        def no_scoring(estimator, X, y):
-            return 0
-
-        estimator = calibrator.estimator
-        cv = check_cv(calibrator.cv, y=y, classifier=is_classifier(estimator))
-        train, test = next(cv.split(X, y, groups=None))
-
-        results = cross_validate(
-            estimator,
-            X[train, :],
-            y[train],
-            cv=self.ensemble_strategy,
-            n_jobs=self.n_jobs,
-            scoring=no_scoring,
-            return_indices=True,
-            return_estimator=True,
-        )
-
-        members = []
-        for member in results["estimator"]:
-            cloned = clone(calibrator)
-            cloned.set_params(cv="prefit", estimator=member)
-            members.append(cloned.fit(X[test], y[test]))
-
-        probe_scores = (probe(member, X, y) for member in members)
-
-        oobs = []
-        for indices_oob in results["indices"]["test"]:
-            oob = np.zeros(n_samples, dtype=bool)
-            oob[indices_oob] = True
-            oobs.append(oob)
-
-        return probe_scores, dict(oobs=oobs)
-
-
-klm_cleanlabcal = ModelProbingDetector(
-    CalibratedClassifierCV(klm, method="isotonic", ensemble=False),
-    IndependentCalibratedEnsemble(
-        RepeatedStratifiedKFold(
-            n_splits=5,
-            n_repeats=1,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-    ),
-    probe="confidence",
-    aggregate=oob(mean),
-)
-param_grid_klm_cleanlabcal = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-klm_consensus_calibrated = ModelProbingDetector(
-    CalibratedClassifierCV(klm, method="isotonic", ensemble=False),
-    IndependentCalibratedEnsemble(
-        RepeatedStratifiedKFold(
-            n_splits=5,
-            n_repeats=1,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-    ),
-    probe="accuracy",
-    aggregate=oob(mean),
-)
-param_grid_klm_consensus_calibrated = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-
-class NoEnsembleCalibrated(AbstractEnsemble):
-    """A no-op Ensemble"""
-
-    def probe_model(self, calibrator, X, y, probe):
-        estimator = calibrator.estimator
-        cv = check_cv(calibrator.cv, y=y, classifier=is_classifier(estimator))
-        train, test = next(cv.split(X, y, groups=None))
-
-        base_model = clone(estimator)
-        base_model.fit(X[train, :], y[train])
-        cloned = clone(calibrator)
-        cloned.set_params(cv="prefit", estimator=base_model)
-        probe_scores = probe(cloned.fit(X[test], y[test]), X, y)
-
-        return [probe_scores], {}
-
-
-klm_smallloss_calibrated = ModelProbingDetector(
-    CalibratedClassifierCV(klm, method="isotonic", ensemble=False),
-    NoEnsembleCalibrated(),
-    probe="cross_entropy",
-    aggregate="sum",
-)
-param_grid_klm_smallloss_calibrated = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-
-##CALIBRATION TEMPERATURE SCALING
-
-klm_aumcal = AreaUnderMargin(
-    CalibratedClassifierCV(klm, method="temperature", ensemble=False)
-)
-param_grid_klm_aumcal = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-klm_forget_cal = ForgetScores(
-    CalibratedClassifierCV(klm, method="temperature", ensemble=False)
-)
-param_grid_klm_forget_cal = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-klm_smallloss_calibrated = ModelProbingDetector(
-    CalibratedClassifierCV(klm, method="temperature", ensemble=False),
-    NoEnsembleCalibrated(),
-    probe="cross_entropy",
-    aggregate="sum",
-)
-param_grid_klm_smallloss_calibrated = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-
-klm_cleanlabcal = ModelProbingDetector(
-    CalibratedClassifierCV(klm, method="temperature", ensemble=False),
-    IndependentCalibratedEnsemble(
-        RepeatedStratifiedKFold(
-            n_splits=5,
-            n_repeats=1,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-    ),
-    probe="confidence",
-    aggregate=oob(mean),
-)
-param_grid_klm_cleanlabcal = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-klm_consensus_calibrated = ModelProbingDetector(
-    CalibratedClassifierCV(klm, method="temperature", ensemble=False),
-    IndependentCalibratedEnsemble(
-        RepeatedStratifiedKFold(
-            n_splits=5,
-            n_repeats=1,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-    ),
-    probe="accuracy",
-    aggregate=oob(mean),
-)
-param_grid_klm_consensus_calibrated = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
-
-
-detectors_calibrated = [
-    (
-        "klm_aum_calibrated",
-        klm_aumcal,
-        param_grid_klm_aumcal,
-    ),
-    # (
-    #     "klm_forget_calibrated",
-    #     klm_forget_cal,
-    #     param_grid_klm_forget_cal,
-    # ),
-    # (
-    #     "gb_aum_calibrated",
-    #     gb_aumcal,
-    #     param_grid_gb_aumcal,
-    # ),
-    (
-        "klm_cleanlab_calibrated",
-        klm_cleanlabcal,
-        param_grid_klm_cleanlabcal,
-    ),
-    (
-        "klm_consensus_calibrated",
-        klm_consensus_calibrated,
-        param_grid_klm_consensus_calibrated,
-    ),
-    (
-        "klm_smallloss_calibrated",
-        klm_smallloss_calibrated,
-        param_grid_klm_smallloss_calibrated,
-    ),
-]
-
-detectors_calibrated = [
-    (f"{n}_temperature", d, g) for (n, d, g) in detectors_calibrated
-]
-
-detectors_calibrated_noisy = [
-    (f"{n}_noisy", d, g) for (n, d, g) in detectors_calibrated
-]
+## ADJUSTED
 
 klm_aum_adjusted = AreaUnderMargin(klm)
 klm_aum_adjusted.probe = Margin(Adjust(Probabilities()))
@@ -577,19 +290,10 @@ class ArgMax:
 klm_forget_adjusted.probe = Accuracy(ArgMax(Adjust(Probabilities())))
 param_grid_klm_forget_adjusted = prefix_param_grid_detector(param_grid_klm)
 
-klm_cleanlab_adjusted = ModelProbingDetector(
-    klm,
-    IndependentEnsemble(
-        RepeatedStratifiedKFold(
-            n_splits=5,
-            n_repeats=1,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-    ),
-    probe=Confidence(Adjust(Probabilities())),
-    aggregate=oob(mean),
+klm_cleanlab_adjusted = ConfidentLearning(
+    klm, n_splits=5, n_repeats=1, n_jobs=-1, random_state=seed
 )
+klm_cleanlab_adjusted.probe = Confidence(Adjust(Probabilities()))
 param_grid_cleanlab_adjusted = prefix_param_grid_detector(param_grid_klm)
 
 klm_consensus_adjusted = ModelProbingDetector(
@@ -608,48 +312,37 @@ klm_consensus_adjusted = ModelProbingDetector(
 param_grid_klm_consensus_adjusted = prefix_param_grid_detector(param_grid_klm)
 
 
-klm_smallloss_calibrated = ModelProbingDetector(
-    CalibratedClassifierCV(klm, method="isotonic", ensemble=False),
-    NoEnsembleCalibrated(),
-    probe=CrossEntropy(Adjust(Probabilities())),
-    aggregate="sum",
-)
-param_grid_klm_smallloss_calibrated = prefix_param_grid_detector(
-    param_grid_prefix("estimator", param_grid_klm)
-)
+klm_smallloss_adjusted = SmallLoss(klm)
+klm_smallloss_adjusted.probe = CrossEntropy(Adjust(Probabilities()))
+param_grid_klm_smallloss_adjusted = prefix_param_grid_detector(param_grid_klm)
 
 
 detectors_adjusted = [
-    # (
-    #     "klm_aum_adjusted",
-    #     klm_aum_adjusted,
-    #     param_grid_adjusted_aum,
-    # ),
-    # (
-    #     "gb_aum_adjusted",
-    #     gb_aum_adjusted,
-    #     param_grid_gb_adjusted_aum,
-    # ),
+    (
+        "klm_aum_adjusted",
+        klm_aum_adjusted,
+        param_grid_adjusted_aum,
+    ),
     # (
     #     "klm_forget_adjusted",
     #     klm_forget_adjusted,
     #     param_grid_klm_forget_adjusted,
     # ),
-    # (
-    #     "klm_cleanlab_adjusted",
-    #     klm_cleanlab_adjusted,
-    #     param_grid_cleanlab_adjusted,
-    # ),
-    # (
-    #     "klm_consensus_adjusted",
-    #     klm_consensus_adjusted,
-    #     param_grid_klm_consensus_adjusted,
-    # ),
-    # (
-    #     "klm_smallloss_adjusted",
-    #     klm_consensus_adjusted,
-    #     param_grid_klm_consensus_adjusted,
-    # ),
+    (
+        "klm_cleanlab_adjusted",
+        klm_cleanlab_adjusted,
+        param_grid_cleanlab_adjusted,
+    ),
+    (
+        "klm_consensus_adjusted",
+        klm_consensus_adjusted,
+        param_grid_klm_consensus_adjusted,
+    ),
+    (
+        "klm_smallloss_adjusted",
+        klm_smallloss_adjusted,
+        param_grid_klm_smallloss_adjusted,
+    ),
 ]
 
 
@@ -727,9 +420,6 @@ detectors_all = (
     + detectors_gb
     + detectors_agra
     + detectors_baseline
-    + detectors_linearized_gb
-    + detectors_calibrated
-    + detectors_calibrated_noisy
     + detectors_adjusted
 )
 
