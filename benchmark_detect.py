@@ -85,7 +85,7 @@ else:
 
 os.makedirs(args.output, exist_ok=True)
 
-for dataset_name, dataset in weak_datasets.items():
+for dataset_name, dataset in weak_datasets:
     (
         X_train,
         X_val,

@@ -199,7 +199,6 @@ def get_weak_datasets(
     calibration=False,
     calibration_size=0.5,
 ):
-    weak_datasets = {}
     for name, fetch, preprocessing, kernel in all_datasets:
         if name not in datasets:
             continue
@@ -299,6 +298,5 @@ def get_weak_datasets(
                     weak_dataset[split]["raw"]
                 )
         weak_dataset["kernel"] = kernel
-        weak_datasets[name] = weak_dataset
 
-    return weak_datasets
+        yield (name, weak_dataset)

@@ -8,3 +8,6 @@ ijcnn*
 archives
 ecai*
 uv.lock
+__pycache__
+gitlock.lock
+

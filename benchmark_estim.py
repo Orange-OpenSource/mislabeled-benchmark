@@ -109,7 +109,7 @@ os.makedirs(args.output, exist_ok=True)
 
 classifier, param_grid_classifier = classifiers[args.classifier]
 
-for dataset_name, dataset in weak_datasets.items():
+for dataset_name, dataset in weak_datasets:
     (
         X_train,
         X_val,
