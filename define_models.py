@@ -8,11 +8,7 @@ from catboost import CatBoostClassifier
 from scipy.stats import loguniform, uniform
 from sklearn.kernel_approximation import RBFSampler
 from sklearn.linear_model import SGDClassifier
-from sklearn.model_selection import (
-    RandomizedSearchCV,
-    RepeatedStratifiedKFold,
-    StratifiedShuffleSplit,
-)
+from sklearn.model_selection import RandomizedSearchCV, RepeatedStratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -35,7 +31,6 @@ from mislabeled.ensemble import (
     IndependentEnsemble,
     LeaveOneOutEnsemble,
     NoEnsemble,
-    ProgressiveEnsemble,
     staged_fit,
 )
 from mislabeled.probe import (
@@ -346,65 +341,6 @@ detectors_adjusted = [
 ]
 
 
-## AGRA SPECIFIC DETECTORS DEFINITION
-
-progressive_agra = ModelProbingDetector(
-    klm, ProgressiveEnsemble(), GradSimilarity(), "sum"
-)
-param_grid_progressive_agra = prefix_param_grid_detector(param_grid_klm)
-
-
-def derivative(scores, masks):
-    return scores[:, :, -1] - scores[:, :, 0]
-
-
-forget_agra = ModelProbingDetector(
-    klm, ProgressiveEnsemble(), GradSimilarity(), derivative
-)
-param_grid_forget_agra = prefix_param_grid_detector(param_grid_klm)
-
-independent_agra = ModelProbingDetector(
-    klm,
-    IndependentEnsemble(
-        StratifiedShuffleSplit(
-            train_size=0.7,
-            n_splits=50,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-        # in_the_bag=True,
-    ),
-    GradSimilarity(),
-    "sum",
-)
-param_grid_independent_agra = prefix_param_grid_detector(param_grid_klm)
-
-oob_agra = ModelProbingDetector(
-    klm,
-    IndependentEnsemble(
-        RepeatedStratifiedKFold(
-            n_splits=5,
-            n_repeats=10,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-    ),
-    GradSimilarity(),
-    "mean_oob",
-)
-param_grid_oob_agra = prefix_param_grid_detector(param_grid_klm)
-
-loss = ModelProbingDetector(klm, NoEnsemble(), "entropy", "sum")
-param_grid_loss = prefix_param_grid_detector(param_grid_klm)
-
-detectors_agra = [
-    ("agra", agra, param_grid_agra),
-    ("progressive_agra", progressive_agra, param_grid_progressive_agra),
-    ("independent_agra", independent_agra, param_grid_independent_agra),
-    ("oob_agra", oob_agra, param_grid_oob_agra),
-    ("loss", loss, param_grid_loss),
-]
-
 detectors_baseline = [
     ("gold", None, None),
     ("white_gold", None, None),
@@ -418,7 +354,6 @@ detectors_all = (
     detectors_knn
     + detectors_klm
     + detectors_gb
-    + detectors_agra
     + detectors_baseline
     + detectors_adjusted
 )
