@@ -308,7 +308,7 @@ for dataset_name, dataset in weak_datasets:
                     elif detector_name.startswith("none"):
                         model.fit(X_train_labeled, y_train_labeled)
                     elif detector_name.startswith("calibrated"):
-                        X_calib, y_calib = train_test_split(
+                        X_calib, _, y_calib, _ = train_test_split(
                             X_val,
                             y_val,
                             train_size=0.2,
@@ -316,31 +316,18 @@ for dataset_name, dataset in weak_datasets:
                             stratify=y_val,
                         )
                         unlabeled_calib = y_calib == -1
-                        y_train_labeled = np.concatenate(
-                            (y_noisy_train[~unlabeled], y_calib[~unlabeled_calib])
-                        )
-                        calibration_split = np.concatenate(
-                            (
-                                -np.ones(X_train_labeled.shape[0]),
-                                np.zeros(X_calib[~unlabeled_calib].shape[0]),
-                            )
-                        )
                         if sp.issparse(X_train_labeled):
-                            X_train_labeled = sp.vstack(
-                                (X_train_labeled, X_calib[~unlabeled_calib]),
-                                format=X_train_labeled.format,
-                            )
+                            X_calib_labeled = sp.csc_matrix(X_calib[~unlabeled_calib])
                         else:
-                            X_train_labeled = np.asfortranarray(
-                                np.vstack((X_train_labeled, X_calib[~unlabeled_calib]))
+                            X_calib_labeled = np.asfortranarray(
+                                X_calib[~unlabeled_calib]
                             )
-                        model = CalibratedClassifierCV(
-                            model,
-                            method="isotonic",
-                            cv=PredefinedSplit(calibration_split),
-                            ensemble=False,
-                        )
+                        y_calib_labeled = y_calib[~unlabeled_calib]
                         model.fit(X_train_labeled, y_train_labeled)
+                        model = CalibratedClassifierCV(
+                            model, method="isotonic", cv="prefit", ensemble=False
+                        )
+                        model.fit(X_calib_labeled, y_calib_labeled)
                     elif detector_name.startswith("wood"):
                         rng = np.random.RandomState(seed)
                         y_wood_train = y_noisy_train.copy()
