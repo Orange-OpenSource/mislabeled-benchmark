@@ -135,14 +135,14 @@ for dataset_name, dataset in weak_datasets:
     X_val = X_val.astype(np.float32)
     X_test = X_test.astype(np.float32)
 
+    unlabeled = y_noisy_train == -1
+
     if sp.issparse(X_train):
-        unlabeled = y_noisy_train == -1
         X_train_labeled = sp.csc_matrix(X_train[~unlabeled])
         X_val = sp.csc_matrix(X_val)
         X_test = sp.csc_matrix(X_test)
 
     else:
-        unlabeled = y_noisy_train == -1
         X_train_labeled = np.asfortranarray(X_train[~unlabeled])
         X_val = np.asfortranarray(X_val)
         X_test = np.asfortranarray(X_test)
@@ -154,20 +154,13 @@ for dataset_name, dataset in weak_datasets:
         y_calib = np.array(y_calib)
         if args.calibration_set == "noisy":
             unlabeled_calib = y_noisy_calib == -1
-            y_train_labeled = np.concatenate(
-                (
-                    y_noisy_train[~unlabeled],
-                    y_noisy_calib[~unlabeled_calib],
-                )
-            )
+            y_calib_labeled = y_noisy_calib[~unlabeled_calib]
+
         elif args.calibration_set == "clean":
             unlabeled_calib = y_calib == -1
-            y_train_labeled = np.concatenate(
-                (
-                    y_noisy_train[~unlabeled],
-                    y_calib[~unlabeled_calib],
-                )
-            )
+            y_calib_labeled = y_calib[~unlabeled_calib]
+
+        y_train_labeled = np.concatenate((y_noisy_train[~unlabeled], y_calib_labeled))
         calibration_split = np.concatenate(
             (
                 -np.ones(X_train[~unlabeled].shape[0]),

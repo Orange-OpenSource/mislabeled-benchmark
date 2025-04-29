@@ -12,6 +12,7 @@ from functools import partial
 import h5py
 import numpy as np
 import scipy.sparse as sp
+from sklearn.calibration import CalibratedClassifierCV
 from autocommit import autocommit
 from datasets import get_weak_datasets
 from define_models import baselines, classifiers, kernels, param_grid_prefix, splitters
@@ -23,7 +24,7 @@ from sklearn.metrics import (
     cohen_kappa_score,
     log_loss,
 )
-from sklearn.model_selection import ParameterGrid, ParameterSampler
+from sklearn.model_selection import ParameterGrid, ParameterSampler, PredefinedSplit
 
 from mislabeled.handle import FilterClassifier
 from mislabeled.split import PerClassSplitter
@@ -43,6 +44,11 @@ parser.add_argument("--restart_from", default="")
 parser.add_argument("--strategy", default="filter", choices=["filter", "relabel"])
 parser.add_argument("--by_class", action="store_true")
 parser.add_argument("--n_sampling_estim", type=int, default=3)
+parser.add_argument(
+    "--calibration",
+    choices=["none", "sigmoid", "isotonic", "temperature"],
+    default="none",
+)
 
 args = parser.parse_args()
 commit_hash = autocommit()
@@ -104,6 +110,8 @@ weak_datasets = get_weak_datasets(
     corruption=args.corruption,
     seed=seed,
     datasets=args.dataset,
+    calibration=args.calibration != "none",
+    calibration_size=0.2,
 )
 os.makedirs(args.output, exist_ok=True)
 
@@ -137,28 +145,62 @@ for dataset_name, dataset in weak_datasets:
         dataset["validation"]["soft_targets"],
         dataset["test"]["soft_targets"],
     )
-    unlabeled = y_noisy_train == -1
-    X_train_labeled = X_train[~unlabeled]
+
+    if args.calibration != "none":
+        (
+            X_calib,
+            y_calib,
+            y_noisy_calib,
+            y_soft_calib,
+        ) = (
+            dataset["calibration"]["data"],
+            dataset["calibration"]["target"],
+            dataset["calibration"]["noisy_target"],
+            dataset["calibration"]["soft_targets"],
+        )
 
     # FASTER TRAINING
-    X_train_labeled = X_train_labeled.astype(np.float32)
     X_train = X_train.astype(np.float32)
     X_val = X_val.astype(np.float32)
     X_test = X_test.astype(np.float32)
 
+    unlabeled = y_noisy_train == -1
+
     if sp.issparse(X_train):
-        X_train_labeled = sp.csc_matrix(X_train_labeled)
-        X_train = sp.csc_matrix(X_train)
+        X_train_labeled = sp.csc_matrix(X_train[~unlabeled])
         X_val = sp.csc_matrix(X_val)
         X_test = sp.csc_matrix(X_test)
 
     else:
-        X_train_labeled = np.asfortranarray(X_train_labeled)
-        X_train = np.asfortranarray(X_train)
+        X_train_labeled = np.asfortranarray(X_train[~unlabeled])
         X_val = np.asfortranarray(X_val)
         X_test = np.asfortranarray(X_test)
 
     y_train = np.array(y_train)
+    y_train_labeled = y_noisy_train[~unlabeled]
+
+    if args.calibration != "none":
+        y_calib = np.array(y_calib)
+
+        unlabeled_calib = y_calib == -1
+        y_calib_labeled = y_calib[~unlabeled_calib]
+
+        y_train_labeled = np.concatenate((y_noisy_train[~unlabeled], y_calib_labeled))
+        calibration_split = np.concatenate(
+            (
+                -np.ones(X_train[~unlabeled].shape[0]),
+                np.zeros(X_calib[~unlabeled_calib].shape[0]),
+            )
+        )
+        if sp.issparse(X_calib):
+            X_train_labeled = sp.csc_matrix(
+                sp.vstack((X_train[~unlabeled], X_calib[~unlabeled_calib]))
+            )
+        else:
+            X_train_labeled = np.asfortranarray(
+                np.vstack((X_train[~unlabeled], X_calib[~unlabeled_calib]))
+            )
+
     clean = y_noisy_train == y_train
 
     unlabeled_val = y_noisy_val == -1
@@ -178,7 +220,8 @@ for dataset_name, dataset in weak_datasets:
     detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
     detectors = detectors + [(d, None) for d in ["none", "random", "silver", "gold"]]
 
-    for detector_name, *_ in detectors:
+    for detector_name in ["none"]:
+        # for detector_name, *_ in detectors:
         final_output_dir = os.path.join(
             args.output, args.corruption, args.classifier, detector_name
         )
@@ -250,6 +293,15 @@ for dataset_name, dataset in weak_datasets:
                 classifier_ = clone(classifier)
                 classifier_.set_params(**params_classifier)
 
+                if args.calibration != "none":
+                    classifier_ = CalibratedClassifierCV(
+                        classifier_,
+                        ensemble=False,
+                        cv=PredefinedSplit(calibration_split),
+                        method=args.calibration,
+                    )
+                    detector_name = detector_name + "_" + args.calibration
+
                 if args.strategy == "filter":
                     model = FilterClassifier(
                         detector,
@@ -293,15 +345,15 @@ for dataset_name, dataset in weak_datasets:
                         stats["by_class"] = True
 
                 try:
-                    if detector_name == "gold":
+                    if detector_name.startswith("gold"):
                         model.fit(X_train, y_train)
-                    elif detector_name == "white_gold":
+                    elif detector_name.startswith("white_gold"):
                         model.fit(X_train_labeled, y_train[~unlabeled])
-                    elif detector_name == "silver":
+                    elif detector_name.startswith("silver"):
                         model.fit(X_train[clean, :], y_noisy_train[clean])
-                    elif detector_name == "none":
+                    elif detector_name.startswith("none"):
                         model.fit(X_train_labeled, y_noisy_train[~unlabeled])
-                    elif detector_name == "wood":
+                    elif detector_name.startswith("wood"):
                         rng = np.random.RandomState(seed)
                         y_wood_train = y_noisy_train.copy()
                         y_wood_train[unlabeled] = rng.choice(
@@ -317,40 +369,21 @@ for dataset_name, dataset in weak_datasets:
                         model.fit(X_train_labeled, y_noisy_train[~unlabeled])
                         stats["strategy"] = "filter"
 
+                    y_pred_train = model.predict(X_train)
                     y_pred_val = model.predict(X_val)
+
+                    y_proba_train = model.predict_proba(X_train)
                     y_proba_val = model.predict_proba(X_val)
-
-                    acc_val = accuracy_score(y_val, y_pred_val)
-                    bacc_val = balanced_accuracy_score(y_val, y_pred_val)
-                    kappa_val = cohen_kappa_score(y_val, y_pred_val)
-                    logl_val = log_loss(y_val, y_proba_val)
-
-                    acc_noisy_val = accuracy_score(
-                        y_noisy_val[~unlabeled_val], y_pred_val[~unlabeled_val]
-                    )
-                    bacc_noisy_val = balanced_accuracy_score(
-                        y_noisy_val[~unlabeled_val], y_pred_val[~unlabeled_val]
-                    )
-                    kappa_noisy_val = cohen_kappa_score(
-                        y_noisy_val[~unlabeled_val], y_pred_val[~unlabeled_val]
-                    )
-                    logl_noisy_val = log_loss(
-                        y_noisy_val[~unlabeled_val], y_proba_val[~unlabeled_val]
-                    )
 
                     y_pred_test = model.predict(X_test)
                     y_proba_test = model.predict_proba(X_test)
 
-                    acc_test = accuracy_score(y_test, y_pred_test)
-                    bacc_test = balanced_accuracy_score(y_test, y_pred_test)
-                    kappa_test = cohen_kappa_score(y_test, y_pred_test)
-                    logl_test = log_loss(y_test, y_proba_test)
-
                     # top-label calibration metrics
-                    for split, y_proba, y in zip(
-                        ["noisy_val", "val", "test"],
-                        [y_proba_val, y_proba_val, y_proba_test],
-                        [y_noisy_val, y_val, y_test],
+                    for split, y_proba, y_pred, y in zip(
+                        ["train", "noisy_val", "val", "test"],
+                        [y_proba_train[~unlabeled], y_proba_val[~unlabeled_val], y_proba_val, y_proba_test],
+                        [y_pred_train[~unlabeled], y_pred_val[~unlabeled_val], y_pred_val, y_pred_test],
+                        [y_noisy_train[~unlabeled], y_noisy_val[~unlabeled_val], y_val, y_test],
                     ):
                         y_proba_max, agreement = multiclass_logits_to_confidences(
                             y_proba, y, probs=True
@@ -358,22 +391,12 @@ for dataset_name, dataset in weak_datasets:
                         ece = smECE(f=y_proba_max, y=agreement)
                         stats[f"ece_{split}"] = ece
 
+                        stats[f"acc_{split}"] = accuracy_score(y, y_pred)
+                        stats[f"bacc_{split}"] = balanced_accuracy_score(y, y_pred)
+                        stats[f"kappa_{split}"] = cohen_kappa_score(y, y_pred)
+                        stats[f"logl_{split}"] = log_loss(y, y_proba)
+
                     end = time.perf_counter()
-
-                    stats["acc_test"] = acc_test
-                    stats["bacc_test"] = bacc_test
-                    stats["kappa_test"] = kappa_test
-                    stats["logl_test"] = logl_test
-
-                    stats["acc_val"] = acc_val
-                    stats["bacc_val"] = bacc_val
-                    stats["kappa_val"] = kappa_val
-                    stats["logl_val"] = logl_val
-
-                    stats["acc_noisy_val"] = acc_noisy_val
-                    stats["bacc_noisy_val"] = bacc_noisy_val
-                    stats["kappa_noisy_val"] = kappa_noisy_val
-                    stats["logl_noisy_val"] = logl_noisy_val
 
                 except Exception as e:
                     import traceback
