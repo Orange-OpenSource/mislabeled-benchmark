@@ -275,7 +275,6 @@ for d in detectors_calibrated:
     if d[0] == "klm_consensus":
         d[1].n_repeats = 1
 
-
 ## ADJUSTED
 
 klm_aum_adjusted = AreaUnderMargin(klm)
@@ -358,6 +357,7 @@ detectors_baseline = [
     ("none", None, None),
     ("wood", None, None),
     ("random", None, None),
+    ("calibrated", None, None),
 ]
 
 detectors_all = (

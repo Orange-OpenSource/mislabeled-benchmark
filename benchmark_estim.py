@@ -12,6 +12,7 @@ from functools import partial
 import h5py
 import numpy as np
 import scipy.sparse as sp
+from sklearn.calibration import CalibratedClassifierCV
 from autocommit import autocommit
 from datasets import get_weak_datasets
 from define_models import baselines, classifiers, kernels, param_grid_prefix, splitters
@@ -23,7 +24,12 @@ from sklearn.metrics import (
     cohen_kappa_score,
     log_loss,
 )
-from sklearn.model_selection import ParameterGrid, ParameterSampler
+from sklearn.model_selection import (
+    ParameterGrid,
+    ParameterSampler,
+    PredefinedSplit,
+    train_test_split,
+)
 
 from mislabeled.handle import FilterClassifier
 from mislabeled.split import PerClassSplitter
@@ -177,7 +183,7 @@ for dataset_name, dataset in weak_datasets:
     detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
     detectors = detectors + [(d, None) for d in ["none", "random", "silver", "gold"]]
 
-    for detector_name in ["none"]:
+    for detector_name in ["calibrated"]:
         # for detector_name, *_ in detectors:
         final_output_dir = os.path.join(
             args.output, args.corruption, args.classifier, detector_name
@@ -300,6 +306,40 @@ for dataset_name, dataset in weak_datasets:
                     elif detector_name.startswith("silver"):
                         model.fit(X_train[clean, :], y_noisy_train[clean])
                     elif detector_name.startswith("none"):
+                        model.fit(X_train_labeled, y_train_labeled)
+                    elif detector_name.startswith("calibrated"):
+                        X_calib, y_calib = train_test_split(
+                            X_val,
+                            y_val,
+                            train_size=0.2,
+                            random_state=seed,
+                            stratify=y_val,
+                        )
+                        unlabeled_calib = y_calib == -1
+                        y_train_labeled = np.concatenate(
+                            (y_noisy_train[~unlabeled], y_calib[~unlabeled_calib])
+                        )
+                        calibration_split = np.concatenate(
+                            (
+                                -np.ones(X_train_labeled.shape[0]),
+                                np.zeros(X_calib[~unlabeled_calib].shape[0]),
+                            )
+                        )
+                        if sp.issparse(X_train_labeled):
+                            X_train_labeled = sp.vstack(
+                                (X_train_labeled, X_calib[~unlabeled_calib]),
+                                format=X_train_labeled.format,
+                            )
+                        else:
+                            X_train_labeled = np.asfortranarray(
+                                np.vstack((X_train_labeled, X_calib[~unlabeled_calib]))
+                            )
+                        model = CalibratedClassifierCV(
+                            model,
+                            method="isotonic",
+                            cv=PredefinedSplit(calibration_split),
+                            ensemble=False,
+                        )
                         model.fit(X_train_labeled, y_train_labeled)
                     elif detector_name.startswith("wood"):
                         rng = np.random.RandomState(seed)

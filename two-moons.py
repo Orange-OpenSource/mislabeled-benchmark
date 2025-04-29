@@ -156,7 +156,7 @@ for i, (n, m, ts) in enumerate(
         plt.scatter([],[], s=40, edgecolors="red", linewidths=1, facecolors="white", label="untrust.")
         plt.scatter([],[], s=40, edgecolors="black", linewidths=1, facecolors="black", marker="*", label="mislab.")
         plt.scatter([],[], s=20, edgecolors="black", linewidths=1, facecolors="black", label="clean.")
-        plt.legend(fontsize=9, loc="upper right", edgecolor="black")
+        plt.legend(loc="upper right", edgecolor="black", handletextpad=0.4, handlelength=1.5)
     plt.xticks(())
     plt.yticks(())
     # ax.scatter([], [], s=60, marker="*", color="black", label="mislabeled")
