@@ -12,7 +12,6 @@ from functools import partial
 import h5py
 import numpy as np
 import scipy.sparse as sp
-from sklearn.calibration import CalibratedClassifierCV
 from autocommit import autocommit
 from datasets import get_weak_datasets
 from define_models import baselines, classifiers, kernels, param_grid_prefix, splitters
@@ -24,7 +23,7 @@ from sklearn.metrics import (
     cohen_kappa_score,
     log_loss,
 )
-from sklearn.model_selection import ParameterGrid, ParameterSampler, PredefinedSplit
+from sklearn.model_selection import ParameterGrid, ParameterSampler
 
 from mislabeled.handle import FilterClassifier
 from mislabeled.split import PerClassSplitter
@@ -44,11 +43,6 @@ parser.add_argument("--restart_from", default="")
 parser.add_argument("--strategy", default="filter", choices=["filter", "relabel"])
 parser.add_argument("--by_class", action="store_true")
 parser.add_argument("--n_sampling_estim", type=int, default=3)
-parser.add_argument(
-    "--calibration",
-    choices=["none", "sigmoid", "isotonic", "temperature"],
-    default="none",
-)
 
 args = parser.parse_args()
 commit_hash = autocommit()
@@ -110,8 +104,6 @@ weak_datasets = get_weak_datasets(
     corruption=args.corruption,
     seed=seed,
     datasets=args.dataset,
-    calibration=args.calibration != "none",
-    calibration_size=0.2,
 )
 os.makedirs(args.output, exist_ok=True)
 
@@ -146,19 +138,6 @@ for dataset_name, dataset in weak_datasets:
         dataset["test"]["soft_targets"],
     )
 
-    if args.calibration != "none":
-        (
-            X_calib,
-            y_calib,
-            y_noisy_calib,
-            y_soft_calib,
-        ) = (
-            dataset["calibration"]["data"],
-            dataset["calibration"]["target"],
-            dataset["calibration"]["noisy_target"],
-            dataset["calibration"]["soft_targets"],
-        )
-
     # FASTER TRAINING
     X_train = X_train.astype(np.float32)
     X_val = X_val.astype(np.float32)
@@ -178,28 +157,6 @@ for dataset_name, dataset in weak_datasets:
 
     y_train = np.array(y_train)
     y_train_labeled = y_noisy_train[~unlabeled]
-
-    if args.calibration != "none":
-        y_calib = np.array(y_calib)
-
-        unlabeled_calib = y_calib == -1
-        y_calib_labeled = y_calib[~unlabeled_calib]
-
-        y_train_labeled = np.concatenate((y_noisy_train[~unlabeled], y_calib_labeled))
-        calibration_split = np.concatenate(
-            (
-                -np.ones(X_train[~unlabeled].shape[0]),
-                np.zeros(X_calib[~unlabeled_calib].shape[0]),
-            )
-        )
-        if sp.issparse(X_calib):
-            X_train_labeled = sp.csc_matrix(
-                sp.vstack((X_train[~unlabeled], X_calib[~unlabeled_calib]))
-            )
-        else:
-            X_train_labeled = np.asfortranarray(
-                np.vstack((X_train[~unlabeled], X_calib[~unlabeled_calib]))
-            )
 
     clean = y_noisy_train == y_train
 
@@ -293,15 +250,6 @@ for dataset_name, dataset in weak_datasets:
                 classifier_ = clone(classifier)
                 classifier_.set_params(**params_classifier)
 
-                if args.calibration != "none":
-                    classifier_ = CalibratedClassifierCV(
-                        classifier_,
-                        ensemble=False,
-                        cv=PredefinedSplit(calibration_split),
-                        method=args.calibration,
-                    )
-                    detector_name = detector_name + "_" + args.calibration
-
                 if args.strategy == "filter":
                     model = FilterClassifier(
                         detector,
@@ -352,7 +300,7 @@ for dataset_name, dataset in weak_datasets:
                     elif detector_name.startswith("silver"):
                         model.fit(X_train[clean, :], y_noisy_train[clean])
                     elif detector_name.startswith("none"):
-                        model.fit(X_train_labeled, y_noisy_train[~unlabeled])
+                        model.fit(X_train_labeled, y_train_labeled)
                     elif detector_name.startswith("wood"):
                         rng = np.random.RandomState(seed)
                         y_wood_train = y_noisy_train.copy()
@@ -381,9 +329,24 @@ for dataset_name, dataset in weak_datasets:
                     # top-label calibration metrics
                     for split, y_proba, y_pred, y in zip(
                         ["train", "noisy_val", "val", "test"],
-                        [y_proba_train[~unlabeled], y_proba_val[~unlabeled_val], y_proba_val, y_proba_test],
-                        [y_pred_train[~unlabeled], y_pred_val[~unlabeled_val], y_pred_val, y_pred_test],
-                        [y_noisy_train[~unlabeled], y_noisy_val[~unlabeled_val], y_val, y_test],
+                        [
+                            y_proba_train[~unlabeled],
+                            y_proba_val[~unlabeled_val],
+                            y_proba_val,
+                            y_proba_test,
+                        ],
+                        [
+                            y_pred_train[~unlabeled],
+                            y_pred_val[~unlabeled_val],
+                            y_pred_val,
+                            y_pred_test,
+                        ],
+                        [
+                            y_noisy_train[~unlabeled],
+                            y_noisy_val[~unlabeled_val],
+                            y_val,
+                            y_test,
+                        ],
                     ):
                         y_proba_max, agreement = multiclass_logits_to_confidences(
                             y_proba, y, probs=True
