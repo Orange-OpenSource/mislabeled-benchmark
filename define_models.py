@@ -230,35 +230,50 @@ param_grid_klm_small_loss = prefix_param_grid_detector(param_grid_klm)
 
 
 detectors_knn = [
-    # ("knn_loo", knn_loo, param_grid_knn_loo),
+    ("knn_loo", knn_loo, param_grid_knn_loo),
 ]
 
 detectors_klm = [
     ("klm_aum", klm_aum, param_grid_klm_aum),
-    # ("klm_forget", klm_forget, param_grid_klm_forget),
+    ("klm_forget", klm_forget, param_grid_klm_forget),
     ("klm_cleanlab", klm_cleanlab, param_grid_klm_cleanlab),
     ("klm_consensus", klm_consensus, param_grid_klm_consensus),
-    # ("klm_influence", influence, param_grid_influence),
-    # ("klm_representer", klm_representer, param_grid_representer),
-    # ("klm_tracin", tracin, param_grid_tracin),
-    # ("klm_vosg", klm_vosg, param_grid_klm_vosg),
-    # ("klm_agra", agra, param_grid_agra),
+    ("klm_influence", influence, param_grid_influence),
+    ("klm_representer", klm_representer, param_grid_representer),
+    ("klm_tracin", tracin, param_grid_tracin),
+    ("klm_vosg", klm_vosg, param_grid_klm_vosg),
+    ("klm_agra", agra, param_grid_agra),
     ("klm_smallloss", klm_small_loss, param_grid_klm_small_loss),
 ]
 
 detectors_gb = [
-    # ("gb_aum", gb_aum, param_grid_gb_aum),
-    # ("gb_forget", gb_forget, param_grid_gb_forget),
-    # ("gb_cleanlab", gb_cleanlab, param_grid_gb_cleanlab),
-    # ("gb_consensus", gb_consensus, param_grid_gb_consensus),
-    # ("gb_influence", gb_influence,  prefix_param_grid_detector(param_grid_gb)),
-    # ("gb_representer", gb_representer,  prefix_param_grid_detector(param_grid_gb)),
-    # ("gb_tracin", gb_tracin,  prefix_param_grid_detector(param_grid_gb)),
-    # ("gb_vosg", gb_vosg, prefix_param_grid_detector(param_grid_gb)),
-    # ("gb_fd_vosg", gb_fd_vosg, param_grid_gb_fd_vosg),
-    # ("gb_smallloss", gb_small_loss, param_grid_gb_small_loss),
-    # ("gb_agra", gb_agra,  prefix_param_grid_detector(param_grid_gb)),
+    ("gb_aum", gb_aum, param_grid_gb_aum),
+    ("gb_forget", gb_forget, param_grid_gb_forget),
+    ("gb_cleanlab", gb_cleanlab, param_grid_gb_cleanlab),
+    ("gb_consensus", gb_consensus, param_grid_gb_consensus),
+    ("gb_influence", gb_influence, prefix_param_grid_detector(param_grid_gb)),
+    ("gb_representer", gb_representer, prefix_param_grid_detector(param_grid_gb)),
+    ("gb_tracin", gb_tracin, prefix_param_grid_detector(param_grid_gb)),
+    ("gb_vosg", gb_vosg, prefix_param_grid_detector(param_grid_gb)),
+    ("gb_fd_vosg", gb_fd_vosg, param_grid_gb_fd_vosg),
+    ("gb_smallloss", gb_small_loss, param_grid_gb_small_loss),
+    ("gb_agra", gb_agra, prefix_param_grid_detector(param_grid_gb)),
 ]
+
+## CALIBRATED
+
+detectors_calibrated = list(
+    filter(
+        lambda detector: detector[0]
+        in ["klm_smallloss", "klm_consensus", "klm_cleanlab", "klm_aum"],
+        detectors_klm,
+    )
+)
+
+# for consistency with cleanlab
+for d in detectors_calibrated:
+    if d[0] == "klm_consensus":
+        d[1].n_repeats = 1
 
 
 ## ADJUSTED
@@ -318,11 +333,6 @@ detectors_adjusted = [
         klm_aum_adjusted,
         param_grid_adjusted_aum,
     ),
-    # (
-    #     "klm_forget_adjusted",
-    #     klm_forget_adjusted,
-    #     param_grid_klm_forget_adjusted,
-    # ),
     (
         "klm_cleanlab_adjusted",
         klm_cleanlab_adjusted,

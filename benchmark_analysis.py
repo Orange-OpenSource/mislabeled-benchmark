@@ -9,6 +9,8 @@ def load_estim(result_dir, discard_datasets=[], discard_methods=[]):
     methods = list(filter(lambda method: method not in discard_methods, methods))
 
     for method in methods:
+        if not os.path.isdir(os.path.join(result_dir, method)):
+            continue
         for fname in os.listdir(os.path.join(result_dir, method)):
             dataset, ext = fname.split(".")
             if ext != "json" or dataset in discard_datasets:

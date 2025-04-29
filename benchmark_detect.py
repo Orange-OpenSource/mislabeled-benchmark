@@ -16,6 +16,7 @@ from define_models import (
     detectors_adjusted,
     detectors_gb,
     detectors_klm,
+    detectors_calibrated,
     kernels,
 )
 from mislabeled.ensemble.calibration import CalibratedEnsemble
@@ -37,10 +38,12 @@ parser.add_argument("--output", default="./output")
 parser.add_argument("--restart_from", default="")
 
 ## Calibration specific arguments
-parser.add_argument("--calibration_set", default="clean")
+parser.add_argument(
+    "--calibration_set", default="clean", choices=["clean", "noisy"]
+)
 parser.add_argument("--calibration_size", default=0.2, type=float)
 parser.add_argument(
-    "--calibration", default="isotonic", choices=["isotonic", "sigmoid", "temperature"]
+    "--calibration", default="isotonic", choices=["isotonic", "sigmoid", "temperature", "none"]
 )
 
 args = parser.parse_args()
@@ -77,7 +80,7 @@ if args.mode == "klm":
 elif args.mode == "gb":
     detectors = detectors_gb
 elif args.mode == "calibration":
-    detectors = detectors_klm
+    detectors = detectors_calibrated
 elif args.mode == "adjust":
     detectors = detectors_adjusted
 else:
@@ -144,9 +147,11 @@ for dataset_name, dataset in weak_datasets:
         X_val = np.asfortranarray(X_val)
         X_test = np.asfortranarray(X_test)
 
+    y_train = np.array(y_train)
     y_train_labeled = y_noisy_train[~unlabeled]
 
-    if args.mode == "calibration":
+    if args.mode == "calibration" and args.calibration != "none":
+        y_calib = np.array(y_calib)
         if args.calibration_set == "noisy":
             unlabeled_calib = y_noisy_calib == -1
             y_train_labeled = np.concatenate(
@@ -155,7 +160,7 @@ for dataset_name, dataset in weak_datasets:
                     y_noisy_calib[~unlabeled_calib],
                 )
             )
-        else:
+        elif args.calibration_set == "clean":
             unlabeled_calib = y_calib == -1
             y_train_labeled = np.concatenate(
                 (
@@ -178,8 +183,6 @@ for dataset_name, dataset in weak_datasets:
                 np.vstack((X_train[~unlabeled], X_calib[~unlabeled_calib]))
             )
 
-    y_train = np.array(y_train)
-
     coverage = 1 - np.mean(unlabeled)
 
     unlabeled_val = y_noisy_val == -1
@@ -193,7 +196,7 @@ for dataset_name, dataset in weak_datasets:
     n_classes = len(labels)
 
     for detector_name, detector_base, param_grid_detector in detectors:
-        if args.mode == "calibration":
+        if args.mode == "calibration" and args.calibration != "none":
             # Calibration naming
             detector_name = detector_name + "_" + args.calibration
 
@@ -260,7 +263,7 @@ for dataset_name, dataset in weak_datasets:
 
             detector = clone(detector_base).set_params(**params)
 
-            if args.mode == "calibration":
+            if args.mode == "calibration" and args.calibration != "none":
                 detector.ensemble = CalibratedEnsemble(
                     detector.ensemble,
                     calibration=args.calibration,

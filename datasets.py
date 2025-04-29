@@ -197,7 +197,7 @@ def get_weak_datasets(
     datasets=datasets_ranked_by_time,
     seed=1,
     calibration=False,
-    calibration_size=0.5,
+    calibration_size=0.2,
 ):
     for name, fetch, preprocessing, kernel in all_datasets:
         if name not in datasets:

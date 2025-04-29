@@ -8,6 +8,7 @@ Read more at https://github.com/knly/texfig
 from math import sqrt
 
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 
 default_width = 5.78853  # in inches
 
@@ -17,7 +18,7 @@ default_ratio = (sqrt(5.0) - 1.0) / 2.0  # golden mean
 # mpl.rcParams["text.usetex"] = True
 # mpl.rcParams["pgf.texsystem"] = "xelatex"
 mpl.rcParams["pgf.rcfonts"] = False
-mpl.rcParams["font.family"] = "serif"
+mpl.rcParams["font.family"] = "Times New Roman"
 mpl.rcParams["font.sans-serif"] = []
 mpl.rcParams["font.monospace"] = []
 mpl.rcParams["figure.figsize"] = [default_width, default_width * default_ratio]
@@ -30,10 +31,10 @@ mpl.rcParams["pgf.preamble"] = "\n".join(
         r"\newcommand{\vect}[1]{#1}",
         # You can use dummy implementations, since your LaTeX document
         # will render these properly, anyway.
-    ])
+    ]
+)
 # mpl.rcParams["text.latex.preamble"] = r"\usepackage{amsmath}"
 
-import matplotlib.pyplot as plt
 
 """
 Returns a figure with an appropriate size and tight layout.
