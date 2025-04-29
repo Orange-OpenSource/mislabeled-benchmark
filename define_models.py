@@ -368,7 +368,7 @@ detectors_all = (
     + detectors_adjusted
 )
 
-baselines = ["gold", "white_gold", "silver", "wood", "none"]
+baselines = ["gold", "white_gold", "silver", "wood", "none", "calibrated"]
 baseline_split = ["random"]
 
 ## SPLITTER DEFINITION

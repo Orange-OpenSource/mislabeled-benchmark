@@ -162,7 +162,6 @@ for dataset_name, dataset in weak_datasets:
         X_test = np.asfortranarray(X_test)
 
     y_train = np.array(y_train)
-    y_train_labeled = y_noisy_train[~unlabeled]
 
     clean = y_noisy_train == y_train
 
@@ -306,7 +305,7 @@ for dataset_name, dataset in weak_datasets:
                     elif detector_name.startswith("silver"):
                         model.fit(X_train[clean, :], y_noisy_train[clean])
                     elif detector_name.startswith("none"):
-                        model.fit(X_train_labeled, y_train_labeled)
+                        model.fit(X_train_labeled, y_noisy_train[~unlabeled])
                     elif detector_name.startswith("calibrated"):
                         X_calib, _, y_calib, _ = train_test_split(
                             X_val,
@@ -322,12 +321,11 @@ for dataset_name, dataset in weak_datasets:
                             X_calib_labeled = np.asfortranarray(
                                 X_calib[~unlabeled_calib]
                             )
-                        y_calib_labeled = y_calib[~unlabeled_calib]
-                        model.fit(X_train_labeled, y_train_labeled)
+                        model.fit(X_train_labeled, y_noisy_train[~unlabeled])
                         model = CalibratedClassifierCV(
                             model, method="isotonic", cv="prefit", ensemble=False
                         )
-                        model.fit(X_calib_labeled, y_calib_labeled)
+                        model.fit(X_calib_labeled, y_calib[~unlabeled_calib])
                     elif detector_name.startswith("wood"):
                         rng = np.random.RandomState(seed)
                         y_wood_train = y_noisy_train.copy()
