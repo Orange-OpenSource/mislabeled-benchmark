@@ -350,15 +350,11 @@ detectors_adjusted = [
 ]
 
 
-detectors_baseline = [
-    ("gold", None, None),
-    ("white_gold", None, None),
-    ("silver", None, None),
-    ("none", None, None),
-    ("wood", None, None),
-    ("random", None, None),
-    ("calibrated", None, None),
-]
+baselines = ["gold", "white_gold", "silver", "wood", "none", "isotonic", "sigmoid"]
+baseline_split = ["random"]
+
+
+detectors_baseline = [(d, None, None) for d in baselines + baseline_split]
 
 detectors_all = (
     detectors_knn
@@ -368,8 +364,6 @@ detectors_all = (
     + detectors_adjusted
 )
 
-baselines = ["gold", "white_gold", "silver", "wood", "none", "calibrated"]
-baseline_split = ["random"]
 
 ## SPLITTER DEFINITION
 

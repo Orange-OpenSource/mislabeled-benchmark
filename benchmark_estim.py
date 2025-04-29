@@ -180,9 +180,9 @@ for dataset_name, dataset in weak_datasets:
         classifier.set_params(kernel=kernel)
 
     detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
-    detectors = detectors + [(d, None) for d in ["none", "random", "silver", "gold"]]
+    detectors = detectors + baselines
 
-    for detector_name in ["calibrated"]:
+    for detector_name in ["isotonic", "sigmoid"]:
         # for detector_name, *_ in detectors:
         final_output_dir = os.path.join(
             args.output, args.corruption, args.classifier, detector_name
@@ -298,15 +298,15 @@ for dataset_name, dataset in weak_datasets:
                         stats["by_class"] = True
 
                 try:
-                    if detector_name.startswith("gold"):
+                    if detector_name == "gold":
                         model.fit(X_train, y_train)
-                    elif detector_name.startswith("white_gold"):
+                    elif detector_name == "white_gold":
                         model.fit(X_train_labeled, y_train[~unlabeled])
-                    elif detector_name.startswith("silver"):
+                    elif detector_name == "silver":
                         model.fit(X_train[clean, :], y_noisy_train[clean])
-                    elif detector_name.startswith("none"):
+                    elif detector_name == "none":
                         model.fit(X_train_labeled, y_noisy_train[~unlabeled])
-                    elif detector_name.startswith("calibrated"):
+                    elif "isotonic" == detector_name or "sigmoid" == detector_name:
                         X_calib, _, y_calib, _ = train_test_split(
                             X_val,
                             y_val,
@@ -314,6 +314,7 @@ for dataset_name, dataset in weak_datasets:
                             random_state=seed,
                             stratify=y_val,
                         )
+                        y_calib = np.asarray(y_calib)
                         unlabeled_calib = y_calib == -1
                         if sp.issparse(X_train_labeled):
                             X_calib_labeled = sp.csc_matrix(X_calib[~unlabeled_calib])
@@ -323,10 +324,10 @@ for dataset_name, dataset in weak_datasets:
                             )
                         model.fit(X_train_labeled, y_noisy_train[~unlabeled])
                         model = CalibratedClassifierCV(
-                            model, method="isotonic", cv="prefit", ensemble=False
+                            model, method=detector_name, cv="prefit", ensemble=False
                         )
                         model.fit(X_calib_labeled, y_calib[~unlabeled_calib])
-                    elif detector_name.startswith("wood"):
+                    elif detector_name == "wood":
                         rng = np.random.RandomState(seed)
                         y_wood_train = y_noisy_train.copy()
                         y_wood_train[unlabeled] = rng.choice(
