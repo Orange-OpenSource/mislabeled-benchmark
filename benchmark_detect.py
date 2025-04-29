@@ -38,12 +38,12 @@ parser.add_argument("--output", default="./output")
 parser.add_argument("--restart_from", default="")
 
 ## Calibration specific arguments
-parser.add_argument(
-    "--calibration_set", default="clean", choices=["clean", "noisy"]
-)
+parser.add_argument("--calibration_set", default="clean", choices=["clean", "noisy"])
 parser.add_argument("--calibration_size", default=0.2, type=float)
 parser.add_argument(
-    "--calibration", default="isotonic", choices=["isotonic", "sigmoid", "temperature", "none"]
+    "--calibration",
+    default="isotonic",
+    choices=["isotonic", "sigmoid", "temperature", "none"],
 )
 
 args = parser.parse_args()
