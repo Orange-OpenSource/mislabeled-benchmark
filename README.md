@@ -1,5 +1,5 @@
-# Mislabeled exemples detection benchmark
+# Mislabeled exemples calibration detection benchmark
 
-python3 benchmark_detect.py --corruption weak --mode calibration --dataset youtube spambase sms mushroom phishing yoruba hausa census bank-marketing trec professor_teacher tennis yelp bioresponse agnews imdb basketball amazon commercial --output ijcnn2 --calibration_size 0.2
+ uv run python3 benchmark_detect.py --corruption weak --mode calibration --dataset yoruba hausa census bank-marketing trec professor_teacher tennis yelp bioresponse agnews imdb basketball amazon commercial mushroom phishing sms spambase youtube --output ecai-sigmoid --calibration isotonic --calibration_set noisy --calibration_size 0.2
 
-python3 benchmark_estim.py --corruption weak --classifier klm --dataset youtube spambase sms mushroom phishing yoruba hausa census bank-marketing trec professor_teacher tennis yelp bioresponse agnews imdb basketball amazon commercial --output ijcnn-output --ts_path ijcnn
+parallel uv run python3 benchmark_estim.py --corruption weak --classifier klm --dataset {} --output ecai-output-sigmoid --ts_path ecai-sigmoid ::: youtube spambase sms mushroom phishing yoruba hausa census bank-marketing trec professor_teacher tennis yelp bioresponse agnews imdb basketball amazon commercial
