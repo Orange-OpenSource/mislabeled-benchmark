@@ -239,6 +239,7 @@ detectors_klm = [
     ("klm_cleanlab", klm_cleanlab, param_grid_klm_cleanlab),
     ("klm_consensus", klm_consensus, param_grid_klm_consensus),
     ("klm_influence", influence, param_grid_influence),
+    ("klm_reinfluence", influence, param_grid_influence),
     ("klm_representer", klm_representer, param_grid_representer),
     ("klm_tracin", tracin, param_grid_tracin),
     ("klm_vosg", klm_vosg, param_grid_klm_vosg),

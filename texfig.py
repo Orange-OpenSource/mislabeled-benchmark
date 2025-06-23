@@ -52,9 +52,9 @@ Returns subplots with an appropriate figure size and tight layout.
 """
 
 
-def subplots(width=default_width, ratio=default_ratio, *args, **kwargs):
+def subplots(width=default_width, ratio=default_ratio, pad=0, *args, **kwargs):
     fig, axes = plt.subplots(figsize=(width, width * ratio), *args, **kwargs)
-    fig.set_tight_layout({"pad": 0})
+    fig.set_tight_layout({"pad": pad})
     return fig, axes
 
 
