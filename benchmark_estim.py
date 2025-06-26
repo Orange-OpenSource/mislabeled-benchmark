@@ -182,8 +182,8 @@ for dataset_name, dataset in weak_datasets:
     detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
     detectors = detectors + baselines
 
-    for detector_name in ["isotonic", "sigmoid"]:
-        # for detector_name, *_ in detectors:
+    for detector_name in ["gold"]:
+        # for detector_name in detectors:
         final_output_dir = os.path.join(
             args.output, args.corruption, args.classifier, detector_name
         )
@@ -374,6 +374,8 @@ for dataset_name, dataset in weak_datasets:
                             y_test,
                         ],
                     ):
+                        if split == "noisy_val" and len(np.unique(y)) == 1:
+                            continue
                         y_proba_max, agreement = multiclass_logits_to_confidences(
                             y_proba, y, probs=True
                         )

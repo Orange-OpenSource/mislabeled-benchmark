@@ -21,7 +21,7 @@ import texfig as tf
 from texfig import TMLR_textwidth
 
 # %%
-X, y = make_moons(1000, spread=0.1, shuffle=True, class_imbalance=0.1, random_state=2)
+X, y = make_moons(1000, spread=0.1, shuffle=True, class_imbalance=0.11, random_state=1)
 xx, yy = np.meshgrid(
     np.linspace(X[:, 0].min() - 0.1, X[:, 0].max() + 0.1, 1000),
     np.linspace(X[:, 1].min() - 0.1, X[:, 1].max() + 0.1, 1000),
@@ -33,9 +33,9 @@ X_train, X_test, y_train, y_test, train, test = train_test_split(
 )
 mislabeled = np.zeros(X_train.shape[0], dtype=bool)
 rng = np.random.RandomState(2)
-mislabeled_maj = rng.choice(np.flatnonzero(y_train == 0), 5)
+mislabeled_maj = rng.choice(np.flatnonzero(y_train == 0), 5, replace=False)
 mislabeled[mislabeled_maj] = True
-mislabeled_min = rng.choice(np.flatnonzero(y_train == 1), 5)
+mislabeled_min = rng.choice(np.flatnonzero(y_train == 1), 5, replace=False)
 mislabeled[mislabeled_min] = True
 y_train[mislabeled] = 1 - y_train[mislabeled]
 plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train)

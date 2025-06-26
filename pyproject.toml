@@ -12,9 +12,13 @@ dependencies = [
     "matplotlib>=3.10.1",
     "mislabeled[datasets]",
     "relplot>=1.0",
-    "scikit-learn",
+    "scikit-learn<1.7.0",
     "seaborn>=0.13.2",
     "networkx",
+]
+[project.optional-dependencies]
+cifar=[
+    "torch", "torchvision"
 ]
 
 [tool.uv.sources]

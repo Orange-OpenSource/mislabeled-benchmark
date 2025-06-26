@@ -16,7 +16,9 @@ def autocommit():
 
         # saves the current state of the directory into branch
         try:
-            stash_msg = subprocess.check_output(["git", "stash"]).decode("ascii").strip()
+            stash_msg = (
+                subprocess.check_output(["git", "stash"]).decode("ascii").strip()
+            )
         except subprocess.CalledProcessError as e:
             print("git stash stdout output:\n", e.output)
             raise
@@ -56,4 +58,11 @@ def autocommit():
             # reverts working directory (including uncommited changes)
             subprocess.check_call(["git", "stash", "pop"])
 
+    return commit_hash
+
+
+def autocommit():
+    commit_hash = (
+        subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
+    )
     return commit_hash

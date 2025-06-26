@@ -1,9 +1,11 @@
+import importlib
 import numpy as np
 from bqlearn.corruptions import make_label_noise
 from sklearn.compose import make_column_transformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, FunctionTransformer
+from sklearn.utils import gen_batches
 
 from mislabeled.datasets.cifar_n import fetch_cifar_n
 from mislabeled.datasets.weasel import fetch_weasel
@@ -159,8 +161,53 @@ gpu_datasets = (
         ),
         "linear",
     ),
-    ("cifar10", fetch_cifar_n, StandardScaler(), "rbf"),
 )
+
+if importlib.util.find_spec("torch"):
+    import torch
+    from torch import nn
+    from torchvision.models import resnet50
+    from torchvision import transforms
+    import torch.nn.functional as F
+
+    model = resnet50(weights="IMAGENET1K_V2").to(device="mps")
+    model.fc = nn.Identity()
+    preprocessing = FunctionTransformer(
+        lambda X: np.concatenate(
+            [
+                model(
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(
+                        F.interpolate(
+                            torch.from_numpy(X[batch])
+                            .to(device="mps", dtype=torch.float32)
+                            .reshape(-1, 3, 32, 32),
+                            (224, 224),
+                            mode="bilinear",
+                        )
+                        / 255
+                    )
+                )
+                .detach()
+                .cpu()
+                .numpy()
+                for batch in gen_batches(X.shape[0], 128)
+            ],
+            axis=0,
+        )
+    )
+    cifar10 = (
+        "cifar10",
+        fetch_cifar_n,
+        preprocessing,
+        "linear",
+    )
+    cifar100 = (
+        "cifar100",
+        fetch_cifar_n,
+        preprocessing,
+        "linear",
+    )
+    gpu_datasets = gpu_datasets + (cifar10, cifar100)
 
 all_datasets = cpu_datasets + gpu_datasets
 
@@ -186,6 +233,7 @@ datasets_ranked_by_time = [
     "amazon",
     "commercial",
     "cifar10",
+    "cifar100",
 ]
 
 all_datasets = sorted(all_datasets, key=lambda x: datasets_ranked_by_time.index(x[0]))
@@ -232,7 +280,6 @@ def get_weak_datasets(
 
         splits = ["train", "validation", "test"]
         if calibration:
-            print(name, len(weak_dataset["validation"]["data"]))
             weak_dataset["calibration"] = {}
             if calibration_size > len(weak_dataset["validation"]["data"]):
                 (
