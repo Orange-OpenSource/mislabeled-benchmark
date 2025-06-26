@@ -235,7 +235,7 @@ detectors_knn = [
 
 detectors_klm = [
     ("klm_aum", klm_aum, param_grid_klm_aum),
-    ("klm_forget", klm_forget, param_grid_klm_forget),
+    ("klm_smallloss", klm_small_loss, param_grid_klm_small_loss),
     ("klm_cleanlab", klm_cleanlab, param_grid_klm_cleanlab),
     ("klm_consensus", klm_consensus, param_grid_klm_consensus),
     ("klm_influence", influence, param_grid_influence),
@@ -244,21 +244,21 @@ detectors_klm = [
     ("klm_tracin", tracin, param_grid_tracin),
     ("klm_vosg", klm_vosg, param_grid_klm_vosg),
     ("klm_agra", agra, param_grid_agra),
-    ("klm_smallloss", klm_small_loss, param_grid_klm_small_loss),
+    ("klm_forget", klm_forget, param_grid_klm_forget),
 ]
 
 detectors_gb = [
     ("gb_aum", gb_aum, param_grid_gb_aum),
-    ("gb_forget", gb_forget, param_grid_gb_forget),
     ("gb_cleanlab", gb_cleanlab, param_grid_gb_cleanlab),
     ("gb_consensus", gb_consensus, param_grid_gb_consensus),
+    ("gb_smallloss", gb_small_loss, param_grid_gb_small_loss),
     ("gb_influence", gb_influence, prefix_param_grid_detector(param_grid_gb)),
     ("gb_representer", gb_representer, prefix_param_grid_detector(param_grid_gb)),
     ("gb_tracin", gb_tracin, prefix_param_grid_detector(param_grid_gb)),
     ("gb_vosg", gb_vosg, prefix_param_grid_detector(param_grid_gb)),
     ("gb_fd_vosg", gb_fd_vosg, param_grid_gb_fd_vosg),
-    ("gb_smallloss", gb_small_loss, param_grid_gb_small_loss),
     ("gb_agra", gb_agra, prefix_param_grid_detector(param_grid_gb)),
+    ("gb_forget", gb_forget, param_grid_gb_forget),
 ]
 
 ## CALIBRATED

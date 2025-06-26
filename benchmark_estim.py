@@ -182,8 +182,7 @@ for dataset_name, dataset in weak_datasets:
     detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
     detectors = detectors + baselines
 
-    for detector_name in ["gold"]:
-        # for detector_name in detectors:
+    for detector_name in detectors:
         final_output_dir = os.path.join(
             args.output, args.corruption, args.classifier, detector_name
         )
