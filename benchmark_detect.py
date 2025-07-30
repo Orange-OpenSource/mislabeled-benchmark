@@ -39,12 +39,16 @@ parser.add_argument("--restart_from", default="")
 
 ## Calibration specific arguments
 parser.add_argument("--calibration_set", default="clean", choices=["clean", "noisy"])
-parser.add_argument("--calibration_size", default=0.2, type=float)
+parser.add_argument("--calibration_size", default=1.0, type=float)
 parser.add_argument(
     "--calibration",
     default="isotonic",
     choices=["isotonic", "sigmoid", "temperature", "none"],
 )
+
+## Seeding arguments
+# parser.add_argument("--seed", default=1, type=int)
+parser.add_argument("--common-seed", action="store_true")
 
 args = parser.parse_args()
 
@@ -183,7 +187,7 @@ for dataset_name, dataset in weak_datasets:
     clean = y_noisy_train == y_train
     noise_ratio = 1 - np.mean(clean[~unlabeled])
 
-    print(dataset_name, X_train.shape, X_test.shape)
+    print(dataset_name, X_train.shape, X_val.shape, X_test.shape)
 
     labels = dataset["train"]["target_names"]
     n_classes = len(labels)
@@ -240,7 +244,11 @@ for dataset_name, dataset in weak_datasets:
         else:
             results = []
 
-        for params_i, params in enumerate(ParameterSampler(param_grid_detector, 12)):
+        hyperparams_seed = seed if args.common_seed else None
+
+        for params_i, params in enumerate(
+            ParameterSampler(param_grid_detector, 12, random_state=hyperparams_seed)
+        ):
             if params_i < len(results):
                 print("skipped", dataset_name, detector_name, params_i)
                 # already performed... go to next

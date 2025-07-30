@@ -351,11 +351,10 @@ detectors_adjusted = [
 ]
 
 
-baselines = ["gold", "white_gold", "silver", "wood", "none", "isotonic", "sigmoid"]
-baseline_split = ["random"]
+baselines = ["gold", "white_gold", "silver", "wood", "none", "random"]
+baselines_calib = ["isotonic", "sigmoid"]
 
-
-detectors_baseline = [(d, None, None) for d in baselines + baseline_split]
+detectors_baseline = [(d, None, None) for d in baselines]
 
 detectors_all = (
     detectors_knn

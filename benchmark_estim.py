@@ -50,6 +50,10 @@ parser.add_argument("--strategy", default="filter", choices=["filter", "relabel"
 parser.add_argument("--by_class", action="store_true")
 parser.add_argument("--n_sampling_estim", type=int, default=3)
 
+## Seeding arguments
+# parser.add_argument("--seed", default=1, type=int)
+parser.add_argument("--common-seed", action="store_true")
+
 args = parser.parse_args()
 commit_hash = autocommit()
 print(f"I saved the working directory as (possibly detached) commit {commit_hash}")
@@ -234,8 +238,14 @@ for dataset_name, dataset in weak_datasets:
             results = []
 
         skipped = 0
+        hyperparams_seed = seed if args.common_seed else None
+
         for params_i, params_classifier in enumerate(
-            ParameterSampler(param_grid_classifier, 12 * args.n_sampling_estim)
+            ParameterSampler(
+                param_grid_classifier,
+                12 * args.n_sampling_estim,
+                random_state=hyperparams_seed,
+            )
         ):
             if detector_name in baselines:
                 model = clone(classifier)
@@ -244,7 +254,9 @@ for dataset_name, dataset in weak_datasets:
                 splitter_grid = [{}]
             else:
                 if detector_name == "random":
-                    trust_scores = random_trust_scores(seed=1, size=np.sum(~unlabeled))
+                    trust_scores = random_trust_scores(
+                        seed=params_i + seed, size=np.sum(~unlabeled)
+                    )
                 else:
                     stats_detector, trust_scores = trust_score_reader.get(
                         params_i % trust_score_reader.length()
