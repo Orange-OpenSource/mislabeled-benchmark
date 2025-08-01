@@ -83,7 +83,7 @@ def linearize_catboost(estimator: CatBoostClassifier, X, y):
         n_iter=10,
         n_jobs=-1,
     )
-    # linear = LogisticRegressionCV(solver="newton-cg", n_jobs=-1, max_iter=1000)
+    # linear = LogisticRegressionCV(solver="newton-cg", n_jobs=1, max_iter=1000)
     linear.fit(leaves, y)
     return linearize(linear.best_estimator_, leaves, y)
 
@@ -122,7 +122,7 @@ klm = Pipeline(
                 validation_fraction=0.1,
                 n_iter_no_change=5,
                 random_state=seed,
-                n_jobs=-1,
+                n_jobs=1,
             ),
         ),
     ],
@@ -151,7 +151,7 @@ classifiers = {
 
 ## DETECTORS DEFINITION
 
-knn_loo = ModelProbingDetector(knn, LeaveOneOutEnsemble(n_jobs=-1), "accuracy", "sum")
+knn_loo = ModelProbingDetector(knn, LeaveOneOutEnsemble(n_jobs=1), "accuracy", "sum")
 param_grid_knn_loo = prefix_param_grid_detector(param_grid_knn)
 
 gb_aum = AreaUnderMargin(gb, staging="predict")
@@ -180,16 +180,16 @@ klm_forget = ForgetScores(klm)
 param_grid_klm_forget = prefix_param_grid_detector(param_grid_klm)
 
 # Set confident n_repeats to 1 as in cleanlab
-gb_cleanlab = ConfidentLearning(gb, n_repeats=1, random_state=seed)
+gb_cleanlab = ConfidentLearning(gb, n_repeats=5, random_state=seed)
 param_grid_gb_cleanlab = prefix_param_grid_detector(param_grid_gb)
 
-klm_cleanlab = ConfidentLearning(klm, n_repeats=1, n_jobs=-1, random_state=seed)
+klm_cleanlab = ConfidentLearning(klm, n_repeats=5, n_jobs=1, random_state=seed)
 param_grid_klm_cleanlab = prefix_param_grid_detector(param_grid_klm)
 
-gb_consensus = ConsensusConsistency(gb, random_state=seed)
+gb_consensus = ConsensusConsistency(gb, n_repeats=5, random_state=seed)
 param_grid_gb_consensus = prefix_param_grid_detector(param_grid_gb)
 
-klm_consensus = ConsensusConsistency(klm, n_jobs=-1, random_state=seed)
+klm_consensus = ConsensusConsistency(klm, n_repeats=5, n_jobs=1, random_state=seed)
 param_grid_klm_consensus = prefix_param_grid_detector(param_grid_klm)
 
 influence = SelfInfluenceDetector(klm)
@@ -274,7 +274,7 @@ detectors_calibrated = list(
 # for consistency with cleanlab
 for d in detectors_calibrated:
     if d[0] == "klm_consensus":
-        d[1].n_repeats = 1
+        d[1].n_repeats = 5
 
 ## ADJUSTED
 
@@ -301,24 +301,16 @@ klm_forget_adjusted.probe = Accuracy(ArgMax(Adjust(Probabilities())))
 param_grid_klm_forget_adjusted = prefix_param_grid_detector(param_grid_klm)
 
 klm_cleanlab_adjusted = ConfidentLearning(
-    klm, n_splits=5, n_repeats=1, n_jobs=-1, random_state=seed
+    klm, n_repeats=5, n_jobs=1, random_state=seed
 )
 klm_cleanlab_adjusted.probe = Confidence(Adjust(Probabilities()))
 param_grid_cleanlab_adjusted = prefix_param_grid_detector(param_grid_klm)
 
-klm_consensus_adjusted = ModelProbingDetector(
-    klm,
-    IndependentEnsemble(
-        RepeatedStratifiedKFold(
-            n_splits=5,
-            n_repeats=1,
-            random_state=seed,
-        ),
-        n_jobs=-1,
-    ),
-    probe=Accuracy(ArgMax(Adjust(Probabilities()))),
-    aggregate=oob(mean),
+
+klm_consensus_adjusted = ConsensusConsistency(
+    klm, n_repeats=5, n_jobs=1, random_state=seed
 )
+klm_consensus_adjusted.probe = Accuracy(ArgMax(Adjust(Probabilities())))
 param_grid_klm_consensus_adjusted = prefix_param_grid_detector(param_grid_klm)
 
 
@@ -385,11 +377,11 @@ splitters["independent_agra"] = (ThresholdSplitter(0), {})
 splitters["oob_agra"] = (ThresholdSplitter(0), {})
 
 splitters["knn_loo"] = (ThresholdSplitter(1), {})
-splitters["gb_consensus"] = (
-    ThresholdSplitter(),
-    {"threshold": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
-)
-splitters["klm_consensus"] = (
-    ThresholdSplitter(),
-    {"threshold": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
-)
+# splitters["gb_consensus"] = (
+#     ThresholdSplitter(),
+#     {"threshold": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
+# )
+# splitters["klm_consensus"] = (
+#     ThresholdSplitter(),
+#     {"threshold": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
+# )
