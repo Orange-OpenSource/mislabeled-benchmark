@@ -512,13 +512,13 @@ def wilcoxon_holm(alpha=0.05, df_perf=None, verbose=True, asc=False):
     classifiers = list(df_counts.loc[df_counts['count'] == max_nb_datasets]
                        ['competitor'])
     # test the null hypothesis using friedman before doing a post-hoc analysis
-    friedman_p_value = friedmanchisquare(*(
-        np.array(df_perf.loc[df_perf['competitor'] == c]['metric'])
-        for c in classifiers))[1]
-    if friedman_p_value >= alpha:
-        # then the null hypothesis over the entire classifiers cannot be rejected
-        print('the null hypothesis over the entire classifiers cannot be rejected')
-        #exit()
+    # friedman_p_value = friedmanchisquare(*(
+    #     np.array(df_perf.loc[df_perf['competitor'] == c]['metric'])
+    #     for c in classifiers))[1]
+    # if friedman_p_value >= alpha:
+    #     # then the null hypothesis over the entire classifiers cannot be rejected
+    #     print('the null hypothesis over the entire classifiers cannot be rejected')
+    #     #exit()
     # get the number of classifiers
     m = len(classifiers)
     # init array that contains the p-values calculated by the Wilcoxon signed rank test

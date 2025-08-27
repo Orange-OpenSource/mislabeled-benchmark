@@ -343,7 +343,8 @@ detectors_adjusted = [
 ]
 
 
-baselines = ["gold", "white_gold", "silver", "wood", "none", "random"]
+# baselines = ["gold", "white_gold", "silver", "wood", "none", "random"]
+baselines = ["gold", "silver", "none", "random"]
 baselines_calib = ["isotonic", "sigmoid"]
 
 detectors_baseline = [(d, None, None) for d in baselines]

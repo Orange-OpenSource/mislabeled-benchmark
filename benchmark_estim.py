@@ -184,7 +184,7 @@ for dataset_name, dataset in weak_datasets:
         classifier.set_params(kernel=kernel)
 
     detectors = os.listdir(os.path.join(args.ts_path, args.corruption))
-    detectors = detectors + baselines
+    detectors = detectors + baselines + ["random"]
 
     for detector_name in detectors:
         final_output_dir = os.path.join(
@@ -196,7 +196,6 @@ for dataset_name, dataset in weak_datasets:
 
         print(f"{timestamp}: handler for {dataset_name} | {detector_name}")
         if detector_name not in baselines:
-            # splitter, param_grid_splitter = splitters[detector_name]
             splitter, param_grid_splitter = splitters[
                 "_".join(detector_name.split("_")[:2])
             ]

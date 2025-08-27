@@ -39,7 +39,7 @@ parser.add_argument("--restart_from", default="")
 
 ## Calibration specific arguments
 parser.add_argument("--calibration_set", default="clean", choices=["clean", "noisy"])
-parser.add_argument("--calibration_size", default=1.0, type=float)
+parser.add_argument("--calibration_size", default=100, type=int)
 parser.add_argument(
     "--calibration",
     default="isotonic",

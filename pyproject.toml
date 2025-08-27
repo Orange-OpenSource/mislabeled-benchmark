@@ -25,7 +25,7 @@ cifar=[
 [tool.uv.sources]
 mislabeled = { git = "https://github.com/orange-opensource/mislabeled" }
 biquality-learn = { git = "https://github.com/biquality-learn/biquality-learn" }
-# scikit-learn = { git = "https://github.com/virchan/scikit-learn", branch = "issues/28574_implementing_temperature_scaling" }
+#scikit-learn = { git = "https://github.com/scikit-learn/scikit-learn", branch = "main" }
 
 [dependency-groups]
 dev = [
