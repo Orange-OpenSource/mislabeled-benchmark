@@ -1,5 +1,11 @@
 # Mislabeled exemples calibration detection benchmark
 
+**Calibration improves detection of mislabeled examples**  *Ilies Chibane, Thomas George, Pierre Nodet, Vincent Lemaire* https://arxiv.org/pdf/2511.02738
+
+EN. This repository serves to reproduce the benchmark and figures of the paper. It mainly requires the library 'mislabeled' available at https://github.com/Orange-OpenSource/mislabeled.
+
+FR. Ce dépôt sert à reproduire les expériences et figures de l'article. Il se base principalement sur la bibliothèque 'mislabeled' disponible sur https://github.com/Orange-OpenSource/mislabeled.
+
 ## Experiments for calibration set noisy
 parallel uv run python3 benchmark_detect.py --corruption weak --mode calibration --dataset yoruba hausa census bank-marketing trec professor_teacher tennis yelp bioresponse agnews imdb basketball amazon commercial mushroom phishing sms spambase youtube --output ecai-sigmoid-2 --common-seed --calibration isotonic --calibration {} ::: isotonic sigmoid none
 
